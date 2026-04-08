@@ -51,6 +51,25 @@
             color: red;
             text-align: center;
             margin-top: 10px;
+            padding: 10px;
+            background: #ffe6e6;
+            border-radius: 4px;
+        }
+        .success {
+            color: green;
+            text-align: center;
+            margin-top: 10px;
+            padding: 10px;
+            background: #e6ffe6;
+            border-radius: 4px;
+        }
+        .debug-info {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            font-size: 12px;
+            word-break: break-all;
         }
     </style>
 </head>
@@ -60,50 +79,90 @@
         <form id="loginForm">
             <div class="form-group">
                 <label>Username</label>
-                <input type="text" id="username" required>
+                <input type="text" id="username" value="admin" required>
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="password" required>
+                <input type="password" id="password" value="admin123" required>
             </div>
             <button type="submit">Login</button>
             <div id="errorMsg" class="error"></div>
+            <div id="successMsg" class="success"></div>
+            <div id="debugInfo" class="debug-info"></div>
         </form>
     </div>
 
     <script src="/config.js"></script>
     <script>
+        // Debug: Check if config loaded
+        const debugDiv = document.getElementById('debugInfo');
+        
+        if (typeof API_BASE_URL === 'undefined') {
+            debugDiv.innerHTML = '❌ ERROR: config.js not loaded or API_BASE_URL not defined.<br>Make sure config.js exists in the root directory.';
+        } else {
+            debugDiv.innerHTML = `✅ config.js loaded<br>API_BASE_URL: ${API_BASE_URL}`;
+        }
+        
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMsg');
+            const successDiv = document.getElementById('successMsg');
+            
+            // Clear previous messages
+            errorDiv.textContent = '';
+            successDiv.textContent = '';
+            
+            // Validate API URL
+            if (!API_BASE_URL || API_BASE_URL === 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec') {
+                errorDiv.textContent = 'ERROR: API_BASE_URL not configured in config.js';
+                debugDiv.innerHTML += '<br>❌ Please update config.js with your Apps Script Web App URL';
+                return;
+            }
             
             try {
+                debugDiv.innerHTML += `<br>📤 Sending login request for user: ${username}`;
+                
                 const response = await fetch(`${API_BASE_URL}?action=login`, {
                     method: 'POST',
-                    body: JSON.stringify({ username, password })
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        username: username, 
+                        password: password 
+                    })
                 });
                 
+                debugDiv.innerHTML += `<br>📥 Response status: ${response.status}`;
+                
                 const result = await response.json();
+                debugDiv.innerHTML += `<br>📦 Response data: ${JSON.stringify(result)}`;
                 
                 if (result.success) {
+                    successDiv.textContent = 'Login successful! Redirecting...';
                     localStorage.setItem('sessionToken', result.sessionToken);
                     localStorage.setItem('username', result.username);
-                    window.location.href = '/admin-as/dashboard.html';
+                    
+                    debugDiv.innerHTML += `<br>✅ Session token saved: ${result.sessionToken.substring(0, 20)}...`;
+                    
+                    setTimeout(() => {
+                        window.location.href = '/admin-as/dashboard.html';
+                    }, 1000);
                 } else {
-                    document.getElementById('errorMsg').textContent = 'Invalid credentials';
+                    errorDiv.textContent = 'Invalid credentials: ' + (result.error || 'Unknown error');
+                    debugDiv.innerHTML += `<br>❌ Login failed: ${result.error}`;
                 }
             } catch (error) {
-                document.getElementById('errorMsg').textContent = 'Login failed';
+                console.error('Login error:', error);
+                errorDiv.textContent = 'Connection error: ' + error.message;
+                debugDiv.innerHTML += `<br>❌ Connection error: ${error.message}`;
+                debugDiv.innerHTML += `<br>💡 Make sure your Apps Script Web App is deployed with "Anyone" access`;
             }
         });
-        
-        // Check if already logged in
-        const sessionToken = localStorage.getItem('sessionToken');
-        if (sessionToken) {
-            window.location.href = '/admin-as/dashboard.html';
-        }
     </script>
 </body>
 </html>
