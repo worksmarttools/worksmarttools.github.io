@@ -1,0 +1,10 @@
+# Allow all paths
+include:
+  - admin-as
+  - product
+  - css
+  - js
+
+# No Jekyll processing for these files
+exclude:
+  - README.md

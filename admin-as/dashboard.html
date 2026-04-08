@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Worksmart Tools</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .dashboard-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 250px;
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+        }
+        .sidebar h3 {
+            margin-bottom: 20px;
+        }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+        .sidebar li {
+            margin-bottom: 10px;
+        }
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            display: block;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .sidebar a:hover {
+            background: #34495e;
+        }
+        .content {
+            flex: 1;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .form-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .product-table {
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .product-table th, .product-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .product-table th {
+            background: #f8f9fa;
+        }
+        .edit-btn, .delete-btn {
+            padding: 5px 10px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        .edit-btn {
+            background: #28a745;
+            color: white;
+        }
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+        }
+        .category-tag {
+            background: #007bff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="sidebar">
+            <h3>Worksmart Tools</h3>
+            <ul>
+                <li><a href="#" onclick="showSection('products')">📦 Products</a></li>
+                <li><a href="#" onclick="showSection('categories')">🏷️ Categories</a></li>
+                <li><a href="#" onclick="showSection('addProduct')">➕ Add Product</a></li>
+                <li><a href="#" onclick="showSection('addCategory')">➕ Add Category</a></li>
+            </ul>
+        </div>
+        <div class="content">
+            <div class="header">
+                <h2 id="sectionTitle">Products</h2>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+            
+            <div id="productsSection">
+                <div class="product-table-container">
+                    <table class="product-table">
+                        <thead>
+                            <tr><th>Title</th><th>Category</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="productsList"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="categoriesSection" style="display:none;">
+                <div class="product-table-container">
+                    <table class="product-table">
+                        <thead><tr><th>Name</th><th>Slug</th><th>Actions</th></tr></thead>
+                        <tbody id="categoriesList"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div id="addProductSection" style="display:none;">
+                <div class="form-card">
+                    <h3>Add New Product</h3>
+                    <form id="productForm">
+                        <div class="form-group">
+                            <label>Product Title *</label>
+                            <input type="text" id="productTitle" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category *</label>
+                            <select id="productCategory" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Image URL</label>
+                            <input type="text" id="productImage" placeholder="https://...">
+                        </div>
+                        <div class="form-group">
+                            <label>Technical Information</label>
+                            <textarea id="technicalInfo" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Technical Description</label>
+                            <textarea id="technicalDesc" rows="5"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Screenshots (JSON array)</label>
+                            <input type="text" id="screenshots" placeholder='["url1","url2"]'>
+                        </div>
+                        <div class="form-group">
+                            <label>Terms of Service</label>
+                            <textarea id="termsService" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Privacy Policy</label>
+                            <textarea id="privacyPolicy" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Support Info</label>
+                            <textarea id="support" rows="3"></textarea>
+                        </div>
+                        <button type="submit">Add Product</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div id="addCategorySection" style="display:none;">
+                <div class="form-card">
+                    <h3>Add New Category</h3>
+                    <form id="categoryForm">
+                        <div class="form-group">
+                            <label>Category Name *</label>
+                            <input type="text" id="categoryName" required>
+                        </div>
+                        <button type="submit">Add Category</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/config.js"></script>
+    <script>
+        let currentSessionToken = localStorage.getItem('sessionToken');
+        
+        // Check authentication
+        if (!currentSessionToken) {
+            window.location.href = '/admin-as/login.html';
+        }
+        
+        // Verify session
+        async function verifySession() {
+            const response = await fetch(`${API_BASE_URL}?action=verifySession&sessionToken=${currentSessionToken}`);
+            const result = await response.json();
+            if (!result.success) {
+                localStorage.removeItem('sessionToken');
+                window.location.href = '/admin-as/login.html';
+            }
+        }
+        
+        verifySession();
+        
+        // Load categories for dropdown
+        async function loadCategories() {
+            const response = await fetch(`${API_BASE_URL}?action=getCategories`);
+            const result = await response.json();
+            if (result.success) {
+                const categorySelect = document.getElementById('productCategory');
+                categorySelect.innerHTML = '<option value="">Select Category</option>';
+                result.categories.forEach(cat => {
+                    categorySelect.innerHTML += `<option value="${cat.name}">${cat.name}</option>`;
+                });
+            }
+        }
+        
+        // Load products
+        async function loadProducts() {
+            const response = await fetch(`${API_BASE_URL}?action=getProducts`);
+            const result = await response.json();
+            if (result.success) {
+                const tbody = document.getElementById('productsList');
+                tbody.innerHTML = '';
+                result.products.forEach(product => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${product.title}</td>
+                            <td>${product.category}</td>
+                            <td>
+                                <button class="edit-btn" onclick="editProduct('${product.id}')">Edit</button>
+                                <button class="delete-btn" onclick="deleteProduct('${product.id}')">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+        
+        // Load categories
+        async function loadCategoriesList() {
+            const response = await fetch(`${API_BASE_URL}?action=getCategories`);
+            const result = await response.json();
+            if (result.success) {
+                const tbody = document.getElementById('categoriesList');
+                tbody.innerHTML = '';
+                result.categories.forEach(category => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${category.name}</td>
+                            <td>${category.slug}</td>
+                            <td>
+                                <button class="edit-btn" onclick="editCategory('${category.id}')">Edit</button>
+                                <button class="delete-btn" onclick="deleteCategory('${category.id}')">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+        
+        // Add product
+        document.getElementById('productForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const product = {
+                title: document.getElementById('productTitle').value,
+                category: document.getElementById('productCategory').value,
+                imageUrl: document.getElementById('productImage').value,
+                technicalInfo: document.getElementById('technicalInfo').value,
+                technicalDesc: document.getElementById('technicalDesc').value,
+                screenshots: document.getElementById('screenshots').value ? JSON.parse(document.getElementById('screenshots').value) : [],
+                termsOfService: document.getElementById('termsService').value,
+                privacyPolicy: document.getElementById('privacyPolicy').value,
+                support: document.getElementById('support').value,
+                sessionToken: currentSessionToken
+            };
+            
+            const response = await fetch(`${API_BASE_URL}?action=addProduct`, {
+                method: 'POST',
+                body: JSON.stringify(product)
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                alert('Product added!');
+                document.getElementById('productForm').reset();
+                loadProducts();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        });
+        
+        // Add category
+        document.getElementById('categoryForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const category = {
+                name: document.getElementById('categoryName').value,
+                sessionToken: currentSessionToken
+            };
+            
+            const response = await fetch(`${API_BASE_URL}?action=addCategory`, {
+                method: 'POST',
+                body: JSON.stringify(category)
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                alert('Category added!');
+                document.getElementById('categoryForm').reset();
+                loadCategoriesList();
+                loadCategories();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        });
+        
+        // Delete product
+        async function deleteProduct(id) {
+            if (confirm('Delete this product?')) {
+                const response = await fetch(`${API_BASE_URL}?action=deleteProduct`, {
+                    method: 'POST',
+                    body: JSON.stringify({ id: id, sessionToken: currentSessionToken })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    loadProducts();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            }
+        }
+        
+        // Delete category
+        async function deleteCategory(id) {
+            if (confirm('Delete this category?')) {
+                const response = await fetch(`${API_BASE_URL}?action=deleteCategory`, {
+                    method: 'POST',
+                    body: JSON.stringify({ id: id, sessionToken: currentSessionToken })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    loadCategoriesList();
+                    loadCategories();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            }
+        }
+        
+        function showSection(section) {
+            document.getElementById('productsSection').style.display = 'none';
+            document.getElementById('categoriesSection').style.display = 'none';
+            document.getElementById('addProductSection').style.display = 'none';
+            document.getElementById('addCategorySection').style.display = 'none';
+            
+            if (section === 'products') {
+                document.getElementById('productsSection').style.display = 'block';
+                document.getElementById('sectionTitle').textContent = 'Products';
+                loadProducts();
+            } else if (section === 'categories') {
+                document.getElementById('categoriesSection').style.display = 'block';
+                document.getElementById('sectionTitle').textContent = 'Categories';
+                loadCategoriesList();
+            } else if (section === 'addProduct') {
+                document.getElementById('addProductSection').style.display = 'block';
+                document.getElementById('sectionTitle').textContent = 'Add Product';
+                loadCategories();
+            } else if (section === 'addCategory') {
+                document.getElementById('addCategorySection').style.display = 'block';
+                document.getElementById('sectionTitle').textContent = 'Add Category';
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('sessionToken');
+            localStorage.removeItem('username');
+            window.location.href = '/admin-as/login.html';
+        }
+        
+        // Initial load
+        loadProducts();
+        loadCategories();
+    </script>
+</body>
+</html>
