@@ -28,6 +28,31 @@
             background: white;
             border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-container h2 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .login-container .subtitle {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #666;
+            font-size: 14px;
         }
 
         .form-group {
@@ -47,6 +72,12 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
         }
 
         button {
@@ -59,6 +90,7 @@
             cursor: pointer;
             font-size: 16px;
             font-weight: 600;
+            transition: background 0.3s;
         }
 
         button:hover {
@@ -90,39 +122,138 @@
             font-size: 14px;
         }
 
+        .debug-info {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f7fafc;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            word-break: break-all;
+            border: 1px solid #e2e8f0;
+        }
+
+        .debug-info h4 {
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+
         .info-text {
             text-align: center;
             margin-top: 20px;
             color: #718096;
             font-size: 12px;
         }
+
+        .demo-credentials {
+            background: #edf2f7;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .demo-credentials strong {
+            color: #2d3748;
+        }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <h2 style="text-align:center; margin-bottom:10px;">🔐 Admin Login</h2>
+        <h2>🔐 Admin Login</h2>
+        <div class="subtitle">Google Sheet Dependent Dropdown</div>
         
         <form id="loginForm">
             <div class="form-group">
                 <label>Username</label>
-                <input type="text" id="username" placeholder="Enter username" required>
+                <input type="text" id="username" value="admin" required autocomplete="off">
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="password" placeholder="Enter password" required>
+                <input type="password" id="password" value="admin123" required>
             </div>
             <button type="submit" id="loginBtn">Login</button>
             <div id="errorMsg" class="error"></div>
             <div id="successMsg" class="success"></div>
         </form>
 
+        <div class="demo-credentials">
+            <strong>Demo Credentials:</strong><br>
+            Username: admin<br>
+            Password: admin123
+        </div>
+
         <div class="info-text">
-            Admin panel for managing products and categories.
+            This is the admin panel for managing products and categories.
+        </div>
+
+        <div id="debugInfo" class="debug-info" style="display: none;">
+            <h4>🔧 Debug Information</h4>
+            <div id="debugContent"></div>
         </div>
     </div>
 
     <script src="/config.js"></script>
     <script>
+        // Debug flag - set to true to see debug info
+        const DEBUG = true;
+        
+        const debugDiv = document.getElementById('debugInfo');
+        const debugContent = document.getElementById('debugContent');
+        const loginBtn = document.getElementById('loginBtn');
+        
+        function logDebug(message) {
+            if (DEBUG) {
+                debugDiv.style.display = 'block';
+                debugContent.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+                console.log(message);
+            }
+        }
+        
+        function clearDebug() {
+            if (DEBUG) {
+                debugContent.innerHTML = '';
+            }
+        }
+        
+        // Check if config loaded
+        if (typeof API_BASE_URL === 'undefined') {
+            logDebug('❌ ERROR: config.js not loaded or API_BASE_URL not defined');
+            logDebug('Make sure config.js exists in the root directory (worksmarttools.github.io/config.js)');
+            document.getElementById('errorMsg').textContent = 'Configuration error: API_BASE_URL not defined';
+        } else {
+            logDebug('✅ config.js loaded successfully');
+            logDebug(`API_BASE_URL: ${API_BASE_URL}`);
+        }
+        
+        // Check if already logged in
+        const sessionToken = localStorage.getItem('sessionToken');
+        if (sessionToken) {
+            logDebug('Session token found, verifying with server...');
+            // Verify token with server
+            fetch(`${API_BASE_URL}?action=verifySession&sessionToken=${sessionToken}`, {
+                method: 'GET',
+                mode: 'cors'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    logDebug('Session valid, redirecting to dashboard');
+                    window.location.href = '/admin-as/dashboard.html';
+                } else {
+                    logDebug('Session invalid, clearing storage');
+                    localStorage.removeItem('sessionToken');
+                    localStorage.removeItem('username');
+                }
+            })
+            .catch(error => {
+                logDebug(`Session verification error: ${error.message}`);
+                localStorage.removeItem('sessionToken');
+                localStorage.removeItem('username');
+            });
+        }
+        
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -130,63 +261,115 @@
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('errorMsg');
             const successDiv = document.getElementById('successMsg');
-            const loginBtn = document.getElementById('loginBtn');
             
+            // Clear previous messages
             errorDiv.textContent = '';
             successDiv.textContent = '';
+            clearDebug();
             
+            // Validate inputs
             if (!username || !password) {
                 errorDiv.textContent = 'Please enter both username and password';
                 return;
             }
             
-            if (!API_BASE_URL) {
-                errorDiv.textContent = 'Configuration error. Please check config.js';
+            // Validate API URL
+            if (!API_BASE_URL || API_BASE_URL === 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec') {
+                errorDiv.textContent = 'ERROR: API_BASE_URL not configured in config.js';
+                logDebug('❌ API_BASE_URL not configured');
+                logDebug('Please update config.js with your Google Apps Script Web App URL');
                 return;
             }
             
+            // Disable button during login
             loginBtn.disabled = true;
             loginBtn.textContent = 'Logging in...';
             
             try {
-                // Try POST first
-                const response = await fetch(`${API_BASE_URL}`, {
+                logDebug(`📤 Sending login request for user: ${username}`);
+                logDebug(`URL: ${API_BASE_URL}?action=login`);
+                
+                const response = await fetch(`${API_BASE_URL}?action=login`, {
                     method: 'POST',
                     mode: 'cors',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({ 
-                        action: 'login',
                         username: username, 
                         password: password 
                     })
                 });
                 
+                logDebug(`📥 Response status: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const result = await response.json();
+                logDebug(`📦 Response data: ${JSON.stringify(result)}`);
                 
                 if (result.success) {
-                    successDiv.textContent = 'Login successful! Redirecting...';
+                    successDiv.textContent = '✅ Login successful! Redirecting...';
                     localStorage.setItem('sessionToken', result.sessionToken);
                     localStorage.setItem('username', result.username);
+                    
+                    logDebug(`✅ Session token saved: ${result.sessionToken.substring(0, 30)}...`);
+                    logDebug(`✅ Username: ${result.username}`);
                     
                     setTimeout(() => {
                         window.location.href = '/admin-as/dashboard.html';
                     }, 1000);
                 } else {
-                    errorDiv.textContent = result.error || 'Invalid username or password';
+                    errorDiv.textContent = '❌ ' + (result.error || 'Invalid username or password');
+                    logDebug(`❌ Login failed: ${result.error}`);
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                errorDiv.textContent = 'Connection error. Please check:';
-                errorDiv.innerHTML += '<br>• Apps Script is deployed as "Anyone" can access';
-                errorDiv.innerHTML += '<br>• URL in config.js is correct';
-                errorDiv.innerHTML += '<br>• You have an internet connection';
+                errorDiv.textContent = 'Connection error: ' + error.message;
+                logDebug(`❌ Connection error: ${error.message}`);
+                logDebug(`💡 Troubleshooting tips:`);
+                logDebug(`1. Make sure your Apps Script Web App is deployed`);
+                logDebug(`2. Verify "Execute as" is set to "Me"`);
+                logDebug(`3. Verify "Who has access" is set to "Anyone"`);
+                logDebug(`4. Check that the URL in config.js is correct`);
+                logDebug(`5. Redeploy the Web App and update the URL`);
             } finally {
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Login';
             }
         });
+        
+        // Add test connection button (hidden by default, press Ctrl+Shift+D to show)
+        let debugCounter = 0;
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                debugCounter++;
+                if (debugCounter === 3) {
+                    testConnection();
+                    debugCounter = 0;
+                }
+            }
+        });
+        
+        async function testConnection() {
+            logDebug('🔍 Testing API connection...');
+            try {
+                const response = await fetch(`${API_BASE_URL}?action=getCategories`, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                const result = await response.json();
+                logDebug(`✅ API connection successful!`);
+                logDebug(`Response: ${JSON.stringify(result)}`);
+                alert('API connection successful! Check debug panel for details.');
+            } catch (error) {
+                logDebug(`❌ API connection failed: ${error.message}`);
+                alert(`API connection failed: ${error.message}\nCheck debug panel for details.`);
+            }
+        }
     </script>
 </body>
 </html>
