@@ -144,48 +144,29 @@
             color: #718096;
             font-size: 12px;
         }
-
-        .demo-credentials {
-            background: #edf2f7;
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 20px;
-            font-size: 12px;
-            text-align: center;
-        }
-
-        .demo-credentials strong {
-            color: #2d3748;
-        }
     </style>
 </head>
 <body>
     <div class="login-container">
         <h2>🔐 Admin Login</h2>
-        <div class="subtitle">Google Sheet Dependent Dropdown</div>
+        <div class="subtitle">Enter your credentials</div>
         
         <form id="loginForm">
             <div class="form-group">
                 <label>Username</label>
-                <input type="text" id="username" value="admin" required autocomplete="off">
+                <input type="text" id="username" placeholder="Enter username" required autocomplete="off">
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="password" value="admin123" required>
+                <input type="password" id="password" placeholder="Enter password" required>
             </div>
             <button type="submit" id="loginBtn">Login</button>
             <div id="errorMsg" class="error"></div>
             <div id="successMsg" class="success"></div>
         </form>
 
-        <div class="demo-credentials">
-            <strong>Demo Credentials:</strong><br>
-            Username: admin<br>
-            Password: admin123
-        </div>
-
         <div class="info-text">
-            This is the admin panel for managing products and categories.
+            Admin panel for managing products and categories.
         </div>
 
         <div id="debugInfo" class="debug-info" style="display: none;">
@@ -231,7 +212,6 @@
         const sessionToken = localStorage.getItem('sessionToken');
         if (sessionToken) {
             logDebug('Session token found, verifying with server...');
-            // Verify token with server
             fetch(`${API_BASE_URL}?action=verifySession&sessionToken=${sessionToken}`, {
                 method: 'GET',
                 mode: 'cors'
@@ -316,7 +296,7 @@
                     localStorage.setItem('sessionToken', result.sessionToken);
                     localStorage.setItem('username', result.username);
                     
-                    logDebug(`✅ Session token saved: ${result.sessionToken.substring(0, 30)}...`);
+                    logDebug(`✅ Session token saved`);
                     logDebug(`✅ Username: ${result.username}`);
                     
                     setTimeout(() => {
@@ -342,7 +322,7 @@
             }
         });
         
-        // Add test connection button (hidden by default, press Ctrl+Shift+D to show)
+        // Add test connection button (hidden, press Ctrl+Shift+D to show)
         let debugCounter = 0;
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.shiftKey && e.key === 'D') {
