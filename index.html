@@ -91,7 +91,7 @@
             document.getElementById('siteFooter').innerHTML = `<div class="container mx-auto px-4 text-center"><p class="font-black text-lg mb-4 uppercase tracking-[0.3em]">${document.getElementById('siteName').innerText}</p><p class="text-slate-400 font-medium text-sm">${escapeHtml(f.copyright_text || '© 2025 ALL RIGHTS RESERVED')}</p></div>`;
         }
 
-        // FIXED: SEO logic - global SEO only affects meta description/keywords, not page title
+        // SEO: Global only affects meta description/keywords, not page title
         function injectSeoMetaTags() {
             const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
             const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
@@ -105,9 +105,7 @@
             if (hash.startsWith('#/product/')) {
                 const prod = store.products.find(p => p.ID === hash.split('/')[2]);
                 if (prod) {
-                    // SEO Title: use product's SEOTitle, fallback to product Title
                     pageTitle = prod.SEOTitle && prod.SEOTitle.trim() ? prod.SEOTitle : prod.Title;
-                    // SEO Description: use product's SEODesc, fallback to product Summary, then Description
                     metaDescription = prod.SEODesc && prod.SEODesc.trim() ? prod.SEODesc : (prod.Summary || prod.Description || "").substring(0, 160);
                     metaKeywords = prod.SEOKeywords || "";
                     ogImage = prod.OGImage || prod.Thumbnail || seo.default_og_image;
@@ -118,9 +116,6 @@
                     pageTitle = page.Title;
                     metaDescription = page.Content.replace(/<[^>]*>/g, '').substring(0, 160);
                 }
-            } else {
-                // Homepage: use site title from company info, meta description from global SEO
-                pageTitle = company.site_title || "WorkSmart";
             }
             
             document.title = pageTitle;
@@ -144,35 +139,44 @@
                 const base64Data = e.target.result.split(',')[1];
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'uploadImage', data: { file: base64Data, filename: file.name, mimeType: file.type } }) });
                 const json = await res.json();
-                if (json.status === 'success') { document.getElementById(targetFieldId).value = json.url; alert('Uploaded!'); } else alert('Error: ' + json.message);
+                if (json.status === 'success') { 
+                    document.getElementById(targetFieldId).value = json.url; 
+                    alert('Image uploaded!');
+                } else alert('Error: ' + json.message);
             };
             reader.readAsDataURL(file);
         }
 
-        // ======================== BLOCK RENDERING (HOME) ========================
+        // ======================== BLOCK RENDERING (HOME) - FIXED HERO ========================
         function renderBlocks(blocks, container) {
             for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
                 try {
-                    const settings = JSON.parse(block.Settings || '{}');
+                    let settings = {};
+                    if (typeof block.Settings === 'string') {
+                        settings = JSON.parse(block.Settings);
+                    } else {
+                        settings = block.Settings || {};
+                    }
                     if (block.Type === 'hero_image') {
+                        const imageUrl = settings.image && settings.image.trim() !== '' ? settings.image : 'https://images.unsplash.com/photo-1497215728101-856f4ea42174';
                         container.innerHTML += `
                             <div class="relative h-[500px] rounded-[var(--radius)] overflow-hidden mb-12 flex items-center justify-center text-center text-white">
-                                <img src="${settings.image || 'https://images.unsplash.com/photo-1497215728101-856f4ea42174'}" alt="${settings.alt || 'Hero'}" class="absolute inset-0 w-full h-full object-cover brightness-50">
+                                <img src="${imageUrl}" alt="${escapeHtml(settings.alt || 'Hero')}" class="absolute inset-0 w-full h-full object-cover brightness-50">
                                 <div class="relative z-10 p-6 max-w-2xl">
-                                    <h1 class="text-5xl md:text-7xl font-black mb-6 leading-tight">${escapeHtml(settings.caption)}</h1>
-                                    <p class="text-xl mb-10 opacity-90">${escapeHtml(settings.description)}</p>
-                                    <a href="${settings.buttonLink}" class="bg-white text-slate-900 px-10 py-4 rounded-full font-bold hover:scale-105 transition-transform inline-block">${escapeHtml(settings.buttonText)}</a>
+                                    <h1 class="text-5xl md:text-7xl font-black mb-6 leading-tight">${escapeHtml(settings.caption || 'Welcome')}</h1>
+                                    <p class="text-xl mb-10 opacity-90">${escapeHtml(settings.description || '')}</p>
+                                    <a href="${settings.buttonLink || '#/products'}" class="bg-white text-slate-900 px-10 py-4 rounded-full font-bold hover:scale-105 transition-transform inline-block">${escapeHtml(settings.buttonText || 'Explore')}</a>
                                 </div>
                             </div>`;
                     } else if (block.Type === 'carousel') {
                         const slides = settings.slides || [];
                         const swiperId = `swiper-${Date.now()}`;
-                        container.innerHTML += `<div class="swiper ${swiperId} rounded-[var(--radius)] mb-12 overflow-hidden"><div class="swiper-wrapper">${slides.map(slide => `<div class="swiper-slide relative"><img src="${slide.image}" alt="${slide.alt || 'Carousel slide'}" class="w-full h-[500px] object-cover"><div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6"><h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2><p class="text-lg mt-2">${escapeHtml(slide.description)}</p></div></div>`).join('')}</div><div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div></div>`;
+                        container.innerHTML += `<div class="swiper ${swiperId} rounded-[var(--radius)] mb-12 overflow-hidden"><div class="swiper-wrapper">${slides.map(slide => `<div class="swiper-slide relative"><img src="${slide.image}" alt="${escapeHtml(slide.alt || 'Slide')}" class="w-full h-[500px] object-cover"><div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6"><h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2><p class="text-lg mt-2">${escapeHtml(slide.description)}</p></div></div>`).join('')}</div><div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div></div>`;
                         setTimeout(() => new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, autoplay: settings.autoplay ? { delay: settings.interval || 5000 } : false, loop: slides.length > 1 }), 100);
                     } else if (block.Type === 'custom_html') {
                         container.innerHTML += `<div class="mb-12">${settings}</div>`;
                     }
-                } catch(e) { console.error(e); }
+                } catch(e) { console.error('Block render error:', block, e); }
             }
         }
 
@@ -219,7 +223,7 @@
             container.innerHTML = `<article class="max-w-4xl mx-auto py-10"><h1 class="text-5xl font-black mb-10 text-center">${escapeHtml(p.Title)}</h1><div class="bg-white p-8 md:p-12 rounded-[var(--radius)] border shadow-sm prose lg:prose-xl max-w-none">${p.Content}</div></article>`;
         }
 
-        // ======================== ADMIN PANEL (FULL TABBED) ========================
+        // ======================== ADMIN PANEL ========================
         function renderAdmin(container) {
             const token = localStorage.getItem('ws_token');
             if (!token) {
@@ -259,7 +263,7 @@
                 renderCategoriesList();
             } else if (tab === 'seo') {
                 const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `<div class="bg-slate-50 p-6 rounded-2xl space-y-3"><h3 class="font-black text-xl">Global SEO Defaults</h3><input id="seo_title" placeholder="Default Title (NOT used for page title, only for meta if needed)" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Meta Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Meta Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><div class="flex gap-2"><input type="file" id="ogImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('ogImageUpload'),'seo_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload OG Image</button></div><input id="seo_ogimage" placeholder="OG Image URL" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded mt-4">Save SEO</button></div>`;
+                div.innerHTML = `<div class="bg-slate-50 p-6 rounded-2xl space-y-3"><h3 class="font-black text-xl">Global SEO Defaults</h3><input id="seo_title" placeholder="Default Title (NOT used for page title)" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Meta Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Meta Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><div class="flex gap-2"><input type="file" id="ogImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('ogImageUpload'),'seo_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload OG Image</button></div><input id="seo_ogimage" placeholder="OG Image URL" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded mt-4">Save SEO</button></div>`;
             } else if (tab === 'footer') {
                 const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
                 div.innerHTML = `<div class="bg-slate-50 p-6 rounded-2xl space-y-3"><h3 class="font-black text-xl">Footer Settings</h3><input id="footer_copyright" placeholder="Copyright Text" value="${escapeHtml(footer.copyright_text||'')}" class="w-full border p-2 rounded"><textarea id="footer_links" placeholder='Links JSON: [{"text":"Home","url":"/"}]' rows="3" class="w-full border p-2 rounded">${escapeHtml(footer.footer_links||'[]')}</textarea><textarea id="footer_html" placeholder="Custom HTML (overrides above)" rows="4" class="w-full border p-2 rounded">${escapeHtml(footer.footer_html||'')}</textarea><button onclick="saveFooter()" class="btn-primary px-4 py-2 rounded mt-4">Save Footer</button></div>`;
@@ -300,11 +304,11 @@
         window.saveFooter = async () => { const data = { copyright_text: document.getElementById('footer_copyright')?.value, footer_links: document.getElementById('footer_links')?.value, footer_html: document.getElementById('footer_html')?.value }; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateFooter', data }) }); location.reload(); };
         window.addCategory = async () => { const name = document.getElementById('newCatName')?.value; if(!name) return; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveCategory', data:{ name } }) }); location.reload(); };
         
-        // Global delete functions (fixed)
-        window.deleteProductItem = async (id) => { if(confirm('Delete product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
-        window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
-        window.deleteBlock = async (id) => { if(confirm('Delete block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
-        window.deleteCategoryItem = async (id) => { if(confirm('Delete category?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); location.reload(); } };
+        // GLOBAL DELETE FUNCTIONS - FIXED
+        window.deleteProductItem = async (id) => { if(confirm('Permanently delete this product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
+        window.deletePageItem = async (id) => { if(confirm('Permanently delete this page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
+        window.deleteBlock = async (id) => { if(confirm('Permanently delete this content block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
+        window.deleteCategoryItem = async (id) => { if(confirm('Permanently delete this category?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); location.reload(); } };
 
         // ======================== PRODUCT MODAL (EDIT & CREATE) ========================
         window.openProductModal = () => openProductModalEdit(null);
