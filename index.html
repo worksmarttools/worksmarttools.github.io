@@ -5,103 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WorkSmart Tools</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style id="custom-styles">
-        :root { --primary-color: #3b82f6; --base-font-size: 16px; }
+    <style id="theme-styles">
+        :root { --primary-color: #2563eb; --base-font: 16px; }
         .dynamic-bg { background-color: var(--primary-color); }
         .dynamic-text { color: var(--primary-color); }
         .dynamic-border { border-color: var(--primary-color); }
-        body { font-size: var(--base-font-size); }
+        body { font-size: var(--base-font); transition: all 0.3s ease; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 transition-all duration-300">
+<body class="bg-slate-50 text-slate-900">
 
-    <nav class="bg-white shadow-md p-4 sticky top-0 z-50">
+    <nav class="bg-white/80 backdrop-blur-md shadow-sm p-4 sticky top-0 z-50">
         <div class="container mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-2 cursor-pointer" onclick="location.hash='#/'">
-                <img id="site-logo" src="" class="h-10 hidden">
-                <span id="site-name" class="text-xl font-bold">WorkSmart</span>
+            <div class="flex items-center gap-3 cursor-pointer" onclick="location.hash='#/'">
+                <img id="site-logo" src="" class="h-8 hidden">
+                <span id="site-name" class="text-xl font-black tracking-tighter">WORKS_MART</span>
             </div>
-            <div id="nav-links" class="hidden md:flex space-x-6 font-medium text-gray-600">
+            <div id="nav-links" class="hidden md:flex space-x-8 font-semibold text-slate-600 text-sm uppercase tracking-widest">
                 </div>
-            <a href="#/admin-as" class="text-xs bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200 transition">Admin</a>
+            <a href="#/admin-as" class="text-[10px] border px-3 py-1 rounded-full uppercase font-bold tracking-tighter hover:bg-black hover:text-white transition">Admin Portal</a>
         </div>
     </nav>
 
     <main id="app" class="container mx-auto p-6 min-h-screen"></main>
 
-    <footer class="bg-white border-t mt-12 p-8 text-center text-gray-400 text-sm">
+    <footer class="py-12 text-center text-slate-400 text-xs border-t bg-white">
         <p id="footer-text">&copy; WorkSmart Tools</p>
     </footer>
 
     <script>
-        /**
-         * CONFIGURATION
-         * Replace this URL with your published Apps Script Web App URL
-         */
-        const API_URL = "https://script.google.com/macros/s/AKfycbyOpPyGp47Xgbzg622pSKGdGTlXBFGsSCR8dZAbtBwhI8u5QMhpKcp7yKwP2bjBQaX8/exec";
+        // 1. UPDATE THIS URL
+        const API_URL = "https://script.google.com/macros/s/AKfycbz-1L3hT0vN0BKFf86Z2B6C6exRHLKRFS84Ox-SlSgxIzteddAAh981av7396VZbh89/exec";
         
-        // Local Data Cache
-        let store = { company: [], products: [], categories: [] };
+        let store = { company: [], products: [] };
 
-        /**
-         * ROUTER ENGINE
-         * Monitors the URL Hash (#/) and switches views without refreshing the page
-         */
+        // 2. ROUTING LOGIC
         window.addEventListener('hashchange', router);
         window.addEventListener('load', async () => {
-            await fetchData(); // Load data from Google Sheets on first visit
+            await fetchData();
             router();
         });
 
-        /**
-         * DATA SYNC
-         * Fetches the entire database from the Backend
-         */
         async function fetchData() {
             try {
-                const res = await fetch(API_URL, { 
-                    method: 'POST', 
-                    body: JSON.stringify({ action: 'getPublicData' })
-                });
+                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' })});
                 store = await res.json();
-                applyGlobalSettings(); // Apply the theme and logo immediately
-            } catch (e) {
-                console.error("Connection to Google Sheets failed.");
-            }
+                applyTheme();
+            } catch (e) { console.error("Database connection failed."); }
         }
 
-        /**
-         * THEME ENGINE
-         * Injects colors, fonts, and branding from the Spreadsheet into the UI
-         */
-        function applyGlobalSettings() {
-            // Convert Key-Value pairs from Sheet to a JS Object
+        function applyTheme() {
             const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
-            
-            // Branding
             document.title = s.site_title || "WorkSmart Tools";
             document.getElementById('site-name').innerText = s.company_name || "WorkSmart";
-            document.getElementById('footer-text').innerText = `© ${new Date().getFullYear()} ${s.company_name || 'WorkSmart Tools'}`;
             
             const logo = document.getElementById('site-logo');
-            if (s.logo_url) { logo.src = s.logo_url; logo.classList.remove('hidden'); }
+            if(s.logo_url) { logo.src = s.logo_url; logo.classList.remove('hidden'); }
 
-            // Design System (CSS Variables)
             const root = document.documentElement;
-            if (s.primary_color) root.style.setProperty('--primary-color', s.primary_color);
-            if (s.font_size) root.style.setProperty('--base-font-size', s.font_size + "px");
+            if(s.primary_color) root.style.setProperty('--primary-color', s.primary_color);
+            if(s.font_size) root.style.setProperty('--base-font', s.font_size + "px");
 
-            // Navigation Builder
-            const menuHtml = (s.menu_items || "Home").split(',').map(item => `
-                <a href="#/" class="hover:dynamic-text transition-colors">${item.trim()}</a>
-            `).join('');
-            document.getElementById('nav-links').innerHTML = menuHtml;
+            const menu = (s.menu_items || "Home").split(',').map(m => `<a href="#/" class="hover:dynamic-text transition">${m.trim()}</a>`).join('');
+            document.getElementById('nav-links').innerHTML = menu;
         }
 
-        /**
-         * VIEW CONTROLLER
-         * Decides which HTML to show based on the URL path
-         */
         function router() {
             const path = window.location.hash || '#/';
             const app = document.getElementById('app');
@@ -109,29 +77,23 @@
             if (path === '#/') renderHome(app);
             else if (path.startsWith('#/product/')) renderProduct(app, path.split('/')[2]);
             else if (path === '#/admin-as') renderAdmin(app);
-            else app.innerHTML = "<h1 class='text-center py-20'>Page Not Found</h1>";
         }
 
-        /**
-         * HOME VIEW: Hero section and Product Gallery
-         */
+        // 3. HOME VIEW
         function renderHome(container) {
             const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
             container.innerHTML = `
-                <section class="text-center py-20 bg-white rounded-3xl shadow-sm mb-12 px-6">
-                    <h1 class="text-5xl font-black mb-6 tracking-tight">${s.site_title || 'WorkSmart'}</h1>
-                    <p class="text-xl text-gray-500 max-w-2xl mx-auto mb-10">${s.company_desc || ''}</p>
-                    <button class="dynamic-bg text-white px-10 py-4 rounded-full font-bold shadow-xl hover:scale-105 transition transform">Explore Tools</button>
+                <section class="py-20 text-center">
+                    <h1 class="text-6xl font-black mb-6 italic tracking-tighter">${s.site_title || 'WorkSmart'}</h1>
+                    <p class="text-xl text-slate-500 max-w-xl mx-auto">${s.company_desc || ''}</p>
                 </section>
-                
-                <h2 class="text-2xl font-bold mb-8 border-l-4 dynamic-border pl-4">Tool Catalog</h2>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="grid md:grid-cols-3 gap-10">
                     ${store.products.map(p => `
-                        <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all cursor-pointer group" onclick="location.hash='#/product/${p.ID}'">
-                            <img src="${p.Thumbnail}" class="w-full h-56 object-cover group-hover:scale-110 transition duration-500">
-                            <div class="p-6">
-                                <h3 class="font-bold text-xl mb-2">${p.Title}</h3>
-                                <p class="text-gray-400 text-sm line-clamp-2">${p.Summary}</p>
+                        <div class="bg-white rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all cursor-pointer group border border-slate-100" onclick="location.hash='#/product/${p.ID}'">
+                            <img src="${p.Thumbnail}" class="w-full h-64 object-cover group-hover:scale-105 transition duration-500">
+                            <div class="p-8">
+                                <h3 class="font-black text-xl mb-3 uppercase">${p.Title}</h3>
+                                <p class="text-slate-400 text-sm">${p.Summary}</p>
                             </div>
                         </div>
                     `).join('')}
@@ -139,134 +101,105 @@
             `;
         }
 
-        /**
-         * PRODUCT DETAIL VIEW: Dynamic Landing Page
-         */
+        // 4. PRODUCT VIEW
         function renderProduct(container, id) {
-            const p = store.products.find(item => item.ID == id);
-            if (!p) return container.innerHTML = "Product not found";
-            
+            const p = store.products.find(x => x.ID == id);
+            if(!p) return container.innerHTML = "Not Found";
             container.innerHTML = `
-                <div class="max-w-6xl mx-auto">
-                    <button onclick="history.back()" class="mb-8 text-gray-400 hover:text-black">← Back to Gallery</button>
-                    <div class="grid lg:grid-cols-2 gap-16 items-start">
-                        <img src="${p.Thumbnail}" class="w-full rounded-3xl shadow-2xl">
+                <div class="max-w-4xl mx-auto py-10">
+                    <button onclick="history.back()" class="mb-10 text-slate-400 font-bold hover:text-black uppercase text-xs tracking-widest">← Return to Collection</button>
+                    <div class="grid md:grid-cols-2 gap-12">
+                        <img src="${p.Thumbnail}" class="w-full rounded-[3rem] shadow-2xl">
                         <div>
-                            <h1 class="text-5xl font-black mb-6">${p.Title}</h1>
-                            <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-                                <h4 class="text-xs font-black text-gray-300 uppercase tracking-widest mb-4">Technical Details</h4>
-                                <div class="text-gray-600 leading-relaxed">${p.Technical_Info}</div>
+                            <h1 class="text-5xl font-black mb-8 italic">${p.Title}</h1>
+                            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 mb-6">
+                                <h5 class="text-[10px] font-black text-slate-300 uppercase mb-4 tracking-widest">Specifications</h5>
+                                <div class="text-sm leading-relaxed text-slate-600">${p.Technical_Info}</div>
                             </div>
                         </div>
                     </div>
-                    <div class="mt-20">
-                        <h2 class="text-3xl font-bold mb-8">Full Description</h2>
-                        <div class="prose max-w-none text-gray-600 text-lg leading-relaxed">${p.Description}</div>
+                    <div class="mt-16 prose max-w-none">
+                        <h2 class="text-2xl font-black mb-6 border-b pb-4">Overview</h2>
+                        <div class="text-lg text-slate-600 leading-relaxed">${p.Description}</div>
                     </div>
                 </div>
             `;
         }
 
-        /**
-         * ADMIN VIEW: Login & Management Panel
-         */
+        // 5. ADMIN VIEW
         function renderAdmin(container) {
             const token = localStorage.getItem('ws_token');
-            // If not logged in, show login form
-            if (!token) {
+            if(!token) {
                 container.innerHTML = `
-                    <div class="max-w-md mx-auto bg-white p-12 rounded-3xl shadow-2xl mt-10">
-                        <h2 class="text-3xl font-bold mb-8 text-center">Admin Portal</h2>
-                        <input id="adm_user" type="text" placeholder="Username" class="w-full border p-4 mb-4 rounded-xl outline-none focus:ring-2 dynamic-border">
-                        <input id="adm_pass" type="password" placeholder="Password" class="w-full border p-4 mb-8 rounded-xl outline-none focus:ring-2 dynamic-border">
-                        <button onclick="login()" class="w-full dynamic-bg text-white p-4 rounded-xl font-bold shadow-lg">Login</button>
-                    </div>
-                `;
+                    <div class="max-w-md mx-auto bg-white p-12 rounded-[2.5rem] shadow-xl mt-20 border">
+                        <h2 class="text-3xl font-black mb-10 text-center tracking-tighter italic">ADMIN_LOGIN</h2>
+                        <input id="u" placeholder="Username" class="w-full border-b py-4 mb-4 outline-none">
+                        <input id="p" type="password" placeholder="Password" class="w-full border-b py-4 mb-10 outline-none">
+                        <button onclick="login()" class="w-full dynamic-bg text-white p-5 rounded-2xl font-black shadow-lg">AUTHENTICATE</button>
+                    </div>`;
             } else {
-                // If logged in, show the Control Panel
                 const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
                 container.innerHTML = `
-                    <div class="flex justify-between items-end mb-12">
-                        <div>
-                            <h2 class="text-4xl font-black">Design Console</h2>
-                            <p class="text-gray-400">Manage your entire website design and branding</p>
-                        </div>
-                        <button onclick="logout()" class="text-red-500 font-bold hover:underline">Logout</button>
+                    <div class="flex justify-between items-end mb-16">
+                        <h2 class="text-4xl font-black tracking-tighter">CONTROL_PANEL</h2>
+                        <button onclick="logout()" class="text-xs font-bold text-red-500 hover:underline">TERMINATE_SESSION</button>
                     </div>
 
-                    <div class="grid lg:grid-cols-2 gap-10">
-                        <div class="bg-white p-10 rounded-3xl shadow-sm border border-gray-100">
-                            <h3 class="font-bold text-xl mb-8 text-blue-500">Brand Identity</h3>
-                            <label class="text-xs font-bold text-gray-400 uppercase">Site Title</label>
-                            <input id="set_title" value="${s.site_title || ''}" class="w-full border-b py-3 mb-6 outline-none focus:dynamic-border">
-                            
-                            <label class="text-xs font-bold text-gray-400 uppercase">Company Name</label>
-                            <input id="set_name" value="${s.company_name || ''}" class="w-full border-b py-3 mb-6 outline-none focus:dynamic-border">
-
-                            <label class="text-xs font-bold text-gray-400 uppercase">Description</label>
-                            <textarea id="set_desc" class="w-full border-b py-3 mb-6 outline-none focus:dynamic-border h-24">${s.company_desc || ''}</textarea>
-                            
-                            <label class="text-xs font-bold text-gray-400 uppercase">Logo URL</label>
-                            <input id="set_logo" value="${s.logo_url || ''}" class="w-full border-b py-3 outline-none focus:dynamic-border">
+                    <div class="grid lg:grid-cols-2 gap-12 mb-20">
+                        <div class="bg-white p-10 rounded-[2rem] border shadow-sm">
+                            <h3 class="font-black text-lg mb-8 text-blue-600 italic">SITE_BRANDING</h3>
+                            <input id="set_title" value="${s.site_title || ''}" placeholder="Site Title" class="w-full border-b py-3 mb-6 outline-none">
+                            <input id="set_name" value="${s.company_name || ''}" placeholder="Company Name" class="w-full border-b py-3 mb-6 outline-none">
+                            <textarea id="set_desc" placeholder="Global Description" class="w-full border-b py-3 mb-6 outline-none h-20">${s.company_desc || ''}</textarea>
+                            <input id="set_logo" value="${s.logo_url || ''}" placeholder="Logo URL" class="w-full border-b py-3 outline-none">
                         </div>
-
-                        <div class="bg-white p-10 rounded-3xl shadow-sm border border-gray-100">
-                            <h3 class="font-bold text-xl mb-8 text-purple-500">Visual Settings</h3>
-                            <label class="text-xs font-bold text-gray-400 uppercase">Primary Color</label>
-                            <input id="set_color" type="color" value="${s.primary_color || '#3b82f6'}" class="w-full h-12 mb-8 rounded-lg cursor-pointer">
-
-                            <label class="text-xs font-bold text-gray-400 uppercase">Global Font Size (px)</label>
-                            <input id="set_font" type="number" value="${s.font_size || '16'}" class="w-full border-b py-3 mb-6 outline-none focus:dynamic-border">
-
-                            <label class="text-xs font-bold text-gray-400 uppercase">Menu Items (Split by Comma)</label>
-                            <input id="set_menu" value="${s.menu_items || ''}" class="w-full border-b py-3 outline-none focus:dynamic-border">
+                        <div class="bg-white p-10 rounded-[2rem] border shadow-sm">
+                            <h3 class="font-black text-lg mb-8 text-purple-600 italic">UI_SYSTEM</h3>
+                            <label class="text-[10px] font-black text-slate-300">ACCENT_COLOR</label>
+                            <input id="set_color" type="color" value="${s.primary_color || '#2563eb'}" class="w-full h-12 mb-8 cursor-pointer border-none">
+                            <input id="set_font" type="number" value="${s.font_size || '16'}" placeholder="Base Font (px)" class="w-full border-b py-3 mb-6 outline-none">
+                            <input id="set_menu" value="${s.menu_items || ''}" placeholder="Menu (Comma Separated)" class="w-full border-b py-3 outline-none">
                         </div>
                     </div>
+                    <button onclick="saveSettings()" class="bg-black text-white px-12 py-5 rounded-2xl font-black mb-20">COMMIT_CHANGES</button>
 
-                    <div class="mt-12">
-                        <button onclick="saveAllSettings()" class="bg-black text-white px-16 py-5 rounded-2xl font-bold shadow-2xl hover:scale-105 transition transform w-full md:w-auto">
-                            Publish Changes to Live Site
-                        </button>
+                    <div class="flex justify-between items-center mb-10">
+                        <h2 class="text-2xl font-black">INVENTORY</h2>
+                        <button onclick="showAddProduct()" class="dynamic-bg text-white px-8 py-3 rounded-xl font-black">+ NEW_PRODUCT</button>
+                    </div>
+                    <div class="bg-white rounded-3xl border overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 border-b">
+                                <tr><th class="p-6 text-[10px] font-black">PRODUCT</th><th class="p-6 text-[10px] font-black">ACTION</th></tr>
+                            </thead>
+                            <tbody>
+                                ${store.products.map(p => `
+                                    <tr class="border-b last:border-0">
+                                        <td class="p-6 font-bold text-sm">${p.Title}</td>
+                                        <td class="p-6"><button onclick="deleteProduct('${p.ID}')" class="text-red-400 font-bold text-xs">DELETE</button></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
                     </div>
                 `;
             }
         }
 
-        /**
-         * ACTIONS: LOGIN
-         */
+        // 6. ACTIONS
         async function login() {
-            const username = document.getElementById('adm_user').value;
-            const password = document.getElementById('adm_pass').value;
             const res = await fetch(API_URL, { 
                 method: 'POST', 
-                body: JSON.stringify({ action: 'login', data: { username, password } })
+                body: JSON.stringify({ action: 'login', data: { username: document.getElementById('u').value, password: document.getElementById('p').value } })
             });
-            const result = await res.json();
-            if (result.status === 'success') {
-                localStorage.setItem('ws_token', result.token);
-                router();
-            } else alert("Invalid Admin Login");
+            const data = await res.json();
+            if(data.status === 'success') { localStorage.setItem('ws_token', data.token); router(); }
+            else alert("Denied");
         }
 
-        /**
-         * ACTIONS: LOGOUT
-         */
-        function logout() {
-            localStorage.removeItem('ws_token');
-            router();
-        }
+        function logout() { localStorage.removeItem('ws_token'); router(); }
 
-        /**
-         * ACTIONS: SAVE SETTINGS
-         * Collects values from the Admin Panel and sends them to Google Sheets
-         */
-        async function saveAllSettings() {
-            const btn = event.target;
-            const originalText = btn.innerText;
-            btn.innerText = "Connecting to Google Sheets...";
-            btn.disabled = true;
-
+        async function saveSettings() {
             const data = {
                 site_title: document.getElementById('set_title').value,
                 company_name: document.getElementById('set_name').value,
@@ -276,23 +209,51 @@
                 font_size: document.getElementById('set_font').value,
                 menu_items: document.getElementById('set_menu').value
             };
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateSettings', data: data }) });
+            location.reload();
+        }
 
-            try {
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'updateSettings', data: data })
-                });
-                
-                if ((await res.json()).status === 'success') {
-                    alert("Sync Complete! The site has been updated.");
-                    location.reload(); // Refresh to apply all new data
-                }
-            } catch (err) {
-                alert("Error saving data.");
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
+        function showAddProduct() {
+            const html = `
+                <div id="modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+                    <div class="bg-white w-full max-w-4xl p-10 rounded-[2.5rem] max-h-[90vh] overflow-y-auto">
+                        <h2 class="text-2xl font-black mb-10 italic">APPEND_INVENTORY</h2>
+                        <div class="grid md:grid-cols-2 gap-8">
+                            <input id="p_t" placeholder="Product Title" class="w-full border-b py-3 outline-none font-bold">
+                            <input id="p_th" placeholder="Thumbnail URL" class="w-full border-b py-3 outline-none">
+                            <textarea id="p_s" placeholder="Summary (Short)" class="w-full border-b py-3 outline-none"></textarea>
+                            <textarea id="p_te" placeholder="Tech Specs (Bullet Points)" class="w-full border-b py-3 outline-none"></textarea>
+                            <textarea id="p_d" placeholder="Full Description" class="md:col-span-2 w-full border-b py-3 outline-none h-32"></textarea>
+                            <input id="p_st" placeholder="SEO Title" class="w-full border-b py-3 outline-none">
+                            <input id="p_sd" placeholder="SEO Description" class="w-full border-b py-3 outline-none">
+                        </div>
+                        <div class="mt-12 flex gap-4">
+                            <button onclick="submitProduct()" class="dynamic-bg text-white px-10 py-4 rounded-2xl font-black">PUBLISH</button>
+                            <button onclick="document.getElementById('modal').remove()" class="bg-slate-100 px-10 py-4 rounded-2xl font-black">CANCEL</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        async function submitProduct() {
+            const data = {
+                title: document.getElementById('p_t').value,
+                thumb: document.getElementById('p_th').value,
+                summary: document.getElementById('p_s').value,
+                tech: document.getElementById('p_te').value,
+                desc: document.getElementById('p_d').value,
+                seoT: document.getElementById('p_st').value,
+                seoD: document.getElementById('p_sd').value
+            };
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveProduct', data: data }) });
+            location.reload();
+        }
+
+        async function deleteProduct(id) {
+            if(!confirm("Erase from inventory?")) return;
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: {id} }) });
+            location.reload();
         }
     </script>
 </body>
