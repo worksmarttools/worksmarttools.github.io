@@ -3,56 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Showcase - Worksmart Tools</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <title>Login System</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <div class="logo">
-                <h1>Worksmart Tools</h1>
-            </div>
-            <div class="nav-links">
-                <a href="/">Home</a>
-                <a href="#products">Products</a>
-                <a href="#categories">Categories</a>
-                <a href="/admin-as/login.html">Admin</a>
-            </div>
-        </div>
-    </nav>
-
-    <section class="hero">
-        <div class="container">
-            <h1>Welcome to Worksmart Tools</h1>
-            <p>Discover our premium products and services</p>
-        </div>
-    </section>
-
-    <section id="categories" class="categories">
-        <div class="container">
-            <h2>Categories</h2>
-            <div class="category-grid" id="categoryGrid">
-                <div class="loading">Loading categories...</div>
+    <div class="container">
+        <div id="loginForm" class="form-container active">
+            <div class="card">
+                <h2>Login</h2>
+                <form id="loginFormElement">
+                    <div class="input-group">
+                        <label>Username</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Password</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    <button type="submit" id="loginBtn">Sign In</button>
+                    <div id="loginMessage" class="message"></div>
+                </form>
             </div>
         </div>
-    </section>
 
-    <section id="products" class="products">
-        <div class="container">
-            <h2>Our Products</h2>
-            <div class="product-grid" id="productGrid">
-                <div class="loading">Loading products...</div>
+        <div id="dashboard" class="dashboard-container">
+            <div class="card">
+                <div class="dashboard-header">
+                    <h2>Welcome, <span id="welcomeUsername"></span>!</h2>
+                    <button id="logoutBtn" class="logout-btn">Logout</button>
+                </div>
+                <div class="dashboard-content">
+                    <p>You are logged in successfully.</p>
+                </div>
             </div>
         </div>
-    </section>
-
-    <footer>
-        <div class="container">
-            <p>&copy; 2024 Worksmart Tools. All rights reserved.</p>
-        </div>
-    </footer>
-
-    <script src="/config.js"></script>
-    <script src="/js/main.js"></script>
+    </div>
+    <script src="script.js"></script>
 </body>
 </html>
