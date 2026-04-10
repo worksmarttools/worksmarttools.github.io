@@ -142,6 +142,44 @@
         function navigate(path) {
             location.hash = path;
         }
+
+    // --Update Info --
+        async function saveSettings() {
+    const title = document.getElementById('set_title').value;
+    // You can add more fields here (moto, favicon, etc.)
+    
+    const data = {
+        site_title: title,
+        // Add other keys as needed
+    };
+
+    const btn = event.target;
+    btn.innerText = "Saving...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'updateSettings', data: data })
+        });
+        const result = await res.json();
+
+        if (result.status === 'success') {
+            alert("Settings updated successfully!");
+            // Refresh local data and UI
+            await fetchData();
+            router();
+        } else {
+            alert("Error: " + result.message);
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Failed to connect to server.");
+    } finally {
+        btn.innerText = "Update Info";
+        btn.disabled = false;
+    }
+}
     </script>
 </body>
 </html>
