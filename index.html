@@ -20,33 +20,39 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwZtVRco7mOEM7JOlxpWe3LYVpXC5TvLsJeWSTY-GdR7w0w3O26IOH2josmLEG8iU9f/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzimrdzYWvjgF5RHnFYL-bWtX7sWa0PleVDv2QKB-Ig5eVJsENUEI_zO4cC6SU8v6fV/exec";
 
     async function handleLogin() {
-        const username = document.getElementById('user').value;
-        const password = document.getElementById('pass').value;
-        const msg = document.getElementById('msg');
+    const username = document.getElementById('user').value;
+    const password = document.getElementById('pass').value;
+    const msg = document.getElementById('msg');
 
-        msg.innerText = "Checking...";
+    msg.innerText = "Checking...";
 
-        try {
-            const response = await fetch(SCRIPT_URL, {
-                method: "POST",
-                body: JSON.stringify({ username, password })
-            });
-            const result = await response.json();
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: "POST",
+            body: JSON.stringify({ username, password })
+        });
+        
+        const result = await response.json();
 
-            if (result.status === "success") {
-                msg.style.color = "green";
-                msg.innerText = "Welcome, " + username + "!";
-            } else {
-                msg.style.color = "red";
-                msg.innerText = result.message;
-            }
-        } catch (error) {
-            msg.innerText = "Error connecting to server.";
+        if (result.status === "success") {
+            msg.style.color = "green";
+            msg.innerText = "Success! Redirecting...";
+            
+            // Redirect to your dashboard page
+            // If dashboard.html is in the same GitHub repo:
+            window.location.href = "dashboard.html"; 
+        } else {
+            msg.style.color = "red";
+            msg.innerText = result.message;
         }
+    } catch (error) {
+        console.error(error);
+        msg.innerText = "Error connecting to server.";
     }
+}
 </script>
 </body>
 </html>
