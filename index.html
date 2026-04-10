@@ -2,253 +2,328 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WorkSmart Tools | Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>WorkSmart Tools | Intelligent CMS</title>
+    <!-- Tailwind + Fonts + Lightweight Swiper Carousel -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <style>
-        :root { --p-color: #2563eb; }
-        body { font-family: 'Inter', sans-serif; transition: all 0.3s ease; }
-        .dynamic-bg { background-color: var(--p-color); }
+        * { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
+        :root { --p-color: #0f172a; --p-glow: rgba(15,23,42,0.08); }
+        .dynamic-bg { background-color: var(--p-color); transition: all 0.2s ease; }
         .dynamic-text { color: var(--p-color); }
         .dynamic-border { border-color: var(--p-color); }
-        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+        .glass-panel { background: rgba(255,255,255,0.85); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.5); }
+        .hero-gradient { background: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.9) 0%, #f8fafc 90%); }
+        .card-hover { transition: all 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1); }
+        .card-hover:hover { transform: translateY(-8px) scale(1.01); box-shadow: 0 25px 40px -12px rgba(0,0,0,0.2); }
+        .swiper-button-next, .swiper-button-prev { color: var(--p-color) !important; background: white; width: 44px; height: 44px; border-radius: 60px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .swiper-button-next:after, .swiper-button-prev:after { font-size: 20px !important; font-weight: bold; }
+        .animate-fade-in { animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .category-pill.active { background: var(--p-color) !important; color: white !important; box-shadow: 0 6px 14px rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-50 text-slate-800 antialiased">
 
-    <nav class="glass shadow-sm p-4 sticky top-0 z-50 border-b border-white">
-        <div class="container mx-auto flex justify-between items-center">
+    <!-- Dynamic Navbar -->
+    <nav class="glass-panel sticky top-4 z-50 mx-4 md:mx-8 rounded-2xl shadow-md border border-white/40 transition-all">
+        <div class="container mx-auto px-5 py-3 flex flex-wrap justify-between items-center">
             <div class="flex items-center gap-3 cursor-pointer" onclick="location.hash='#/'">
-                <img id="site-logo" src="" class="h-8 hidden rounded">
-                <span id="site-name" class="text-xl font-extrabold tracking-tight">WORKS_MART</span>
+                <img id="site-logo" src="" class="h-9 w-auto rounded-full hidden object-contain">
+                <span id="site-name" class="text-2xl font-black tracking-tight dynamic-text">WORKSMART</span>
             </div>
-            <div id="nav-links" class="hidden md:flex space-x-8 font-semibold text-slate-500 text-xs uppercase tracking-widest"></div>
-            <a href="#/admin-as" class="text-[10px] bg-slate-900 text-white px-4 py-2 rounded-full font-bold uppercase tracking-tighter hover:opacity-80 transition">Dashboard</a>
+            <div id="nav-links" class="hidden md:flex gap-8 text-sm font-semibold uppercase tracking-wide text-slate-500"></div>
+            <a href="#/admin-as" class="text-xs bg-slate-900 text-white px-5 py-2.5 rounded-full font-bold tracking-wider hover:bg-slate-700 transition shadow-md">DASHBOARD</a>
         </div>
     </nav>
 
-    <main id="app" class="container mx-auto p-6 min-h-screen"></main>
+    <main id="app" class="container mx-auto px-5 py-8 min-h-[70vh] animate-fade-in"></main>
 
-    <footer class="py-12 text-center text-slate-400 text-xs border-t bg-white mt-20">
-        <p id="footer-text">&copy; WorkSmart Tools</p>
+    <footer class="mt-28 py-12 text-center text-slate-400 text-sm border-t border-slate-200 bg-white/50">
+        <p id="footer-text" class="tracking-wide">&copy; WorkSmart Tools — Intelligent workflow ecosystem</p>
     </footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbyOVeobpIrsdxMb0qic8Df4acIGUZJ_bBfxhg8h6wm6jDNtZToGhOk3T3_NEkRS4HqM/exec"; // UPDATE THIS
-        let store = { company: [], products: [] };
+        // ======================== CONFIG =========================
+        const API_URL = "https://script.google.com/macros/s/AKfycbzJsQ7v7voJ-I-Ze66AMDv3Ym_QqE1lBOJyoD5w1au4mahliKuo2zMYNo8sjDwLzqn-/exec"; // 🔁 REPLACE WITH YOUR DEPLOYED URL
+        let store = { company: [], products: [], categories: [] };
+        let activeCategoryFilter = "all";
 
-        // ROUTER
-        window.addEventListener('hashchange', router);
-        window.addEventListener('load', async () => { await fetchData(); router(); });
-
+        // ======================== HELPERS =======================
         async function fetchData() {
             try {
-                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' })});
-                store = await res.json();
-                applyTheme();
-            } catch (e) { console.error("Sync Error"); }
+                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
+                const json = await res.json();
+                store = json.data || { company: [], products: [], categories: [] };
+                if (!store.categories) store.categories = [];
+                applyGlobalTheme();
+                updateMetaTagsForRoute();
+            } catch(e) { console.error("Sync error", e); }
         }
 
-        function applyTheme() {
-            const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
-            document.title = s.site_title || "WorkSmart Tools";
-            document.getElementById('site-name').innerText = s.company_name || "WorkSmart";
-            const logo = document.getElementById('site-logo');
-            if(s.logo_url) { logo.src = s.logo_url; logo.classList.remove('hidden'); }
-            const root = document.documentElement;
-            if(s.primary_color) root.style.setProperty('--p-color', s.primary_color);
-            if(s.font_size) document.body.style.fontSize = s.font_size + "px";
-            document.getElementById('nav-links').innerHTML = (s.menu_items || "Home").split(',').map(m => `<a href="#/" class="hover:dynamic-text">${m.trim()}</a>`).join('');
-        }
-
-        function router() {
-            const path = window.location.hash || '#/';
-            const app = document.getElementById('app');
-            if (path === '#/') renderHome(app);
-            else if (path.startsWith('#/product/')) renderProduct(app, path.split('/')[2]);
-            else if (path === '#/admin-as') renderAdmin(app);
-        }
-
-        // VIEWS
-        function renderHome(container) {
-            const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
-            container.innerHTML = `
-                <section class="py-24 text-center">
-                    <h1 class="text-7xl font-black mb-6 tracking-tighter italic text-slate-900">${s.site_title || 'WorkSmart'}</h1>
-                    <p class="text-xl text-slate-400 max-w-2xl mx-auto">${s.company_desc || ''}</p>
-                </section>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-12">
-                    ${store.products.map(p => `
-                        <div class="bg-white rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer group border border-slate-100" onclick="location.hash='#/product/${p.ID}'">
-                            <img src="${p.Thumbnail}" class="w-full h-72 object-cover group-hover:scale-110 transition duration-700">
-                            <div class="p-10">
-                                <h3 class="font-extrabold text-2xl mb-4 tracking-tight uppercase italic">${p.Title}</h3>
-                                <p class="text-slate-400 text-sm leading-relaxed">${p.Summary}</p>
-                            </div>
-                        </div>`).join('')}
-                </div>`;
-        }
-
-        function renderProduct(container, id) {
-            const p = store.products.find(x => x.ID == id);
-            if(!p) return container.innerHTML = "Not Found";
-            container.innerHTML = `
-                <div class="max-w-5xl mx-auto py-10">
-                    <button onclick="history.back()" class="mb-12 text-slate-400 font-bold hover:text-black uppercase text-[10px] tracking-[0.2em]">← Return Home</button>
-                    <div class="grid md:grid-cols-2 gap-20 items-center">
-                        <img src="${p.Thumbnail}" class="w-full rounded-[4rem] shadow-3xl">
-                        <div>
-                            <h1 class="text-6xl font-black mb-10 tracking-tighter italic">${p.Title}</h1>
-                            <div class="bg-white p-10 rounded-[2rem] border border-slate-100 shadow-sm">
-                                <h5 class="text-[10px] font-black text-slate-300 uppercase mb-6 tracking-widest">Tech Specs</h5>
-                                <div class="text-sm text-slate-600 leading-loose">${p.Technical_Info.replace(/\n/g, '<br>')}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-24 max-w-3xl">
-                        <h2 class="text-3xl font-black mb-8 italic">Product Overview</h2>
-                        <div class="text-xl text-slate-500 leading-relaxed font-light">${p.Description}</div>
-                    </div>
-                </div>`;
-        }
-
-        // ADMIN LOGIC
-        function renderAdmin(container) {
-            const token = localStorage.getItem('ws_token');
-            if(!token) {
-                container.innerHTML = `
-                    <div class="max-w-md mx-auto bg-white p-12 rounded-[3rem] shadow-2xl mt-20 border border-slate-100">
-                        <h2 class="text-3xl font-black mb-10 text-center italic tracking-tight">SECURE_AUTH</h2>
-                        <input id="u" placeholder="Username" class="w-full border-b py-4 mb-4 outline-none font-medium">
-                        <input id="p" type="password" placeholder="Password" class="w-full border-b py-4 mb-12 outline-none font-medium">
-                        <button onclick="login()" class="w-full dynamic-bg text-white py-5 rounded-2xl font-black tracking-widest hover:opacity-90">LOGIN</button>
-                    </div>`;
-            } else {
-                const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
-                container.innerHTML = `
-                    <div class="flex justify-between items-center mb-16">
-                        <h2 class="text-4xl font-black tracking-tighter italic">CONSOLE</h2>
-                        <button onclick="logout()" class="text-xs font-bold text-slate-400 hover:text-red-500">SIGN_OUT</button>
-                    </div>
-
-                    <div class="grid lg:grid-cols-2 gap-10 mb-10">
-                        <div class="bg-white p-10 rounded-[2.5rem] border shadow-sm">
-                            <h3 class="font-black text-blue-600 mb-8 uppercase text-xs tracking-widest">Branding</h3>
-                            <input id="set_title" value="${s.site_title || ''}" placeholder="Site Title" class="w-full border-b py-3 mb-6 outline-none">
-                            <input id="set_name" value="${s.company_name || ''}" placeholder="Company Name" class="w-full border-b py-3 mb-6 outline-none">
-                            <textarea id="set_desc" placeholder="Global Description" class="w-full border-b py-3 mb-6 outline-none h-24">${s.company_desc || ''}</textarea>
-                            <input id="set_logo" value="${s.logo_url || ''}" placeholder="Logo URL" class="w-full border-b py-3 outline-none">
-                        </div>
-                        <div class="bg-white p-10 rounded-[2.5rem] border shadow-sm">
-                            <h3 class="font-black text-purple-600 mb-8 uppercase text-xs tracking-widest">Theme</h3>
-                            <label class="text-[10px] font-bold text-slate-300">ACCENT_COLOR</label>
-                            <input id="set_color" type="color" value="${s.primary_color || '#2563eb'}" class="w-full h-12 mb-8 cursor-pointer border-none">
-                            <input id="set_font" type="number" value="${s.font_size || '16'}" placeholder="Base Font (px)" class="w-full border-b py-3 mb-6 outline-none">
-                            <input id="set_menu" value="${s.menu_items || ''}" placeholder="Menu (Comma Separated)" class="w-full border-b py-3 outline-none">
-                        </div>
-                    </div>
-                    <button onclick="saveSettings()" class="bg-slate-900 text-white px-12 py-5 rounded-2xl font-black mb-20 shadow-xl hover:bg-black transition">SAVE_CONFIG</button>
-
-                    <div class="flex justify-between items-center mb-10">
-                        <h2 class="text-3xl font-black italic tracking-tight">INVENTORY</h2>
-                        <button onclick="openProductModal()" class="dynamic-bg text-white px-10 py-4 rounded-2xl font-black shadow-lg hover:opacity-90">+ NEW_ENTRY</button>
-                    </div>
-                    <div class="bg-white rounded-[2rem] border overflow-hidden shadow-sm">
-                        <table class="w-full text-left">
-                            <thead class="bg-slate-50 border-b">
-                                <tr><th class="p-6 text-[10px] font-black text-slate-400">PRODUCT_NAME</th><th class="p-6 text-[10px] font-black text-slate-400 text-right">ACTIONS</th></tr>
-                            </thead>
-                            <tbody>
-                                ${store.products.map(p => `
-                                    <tr class="border-b last:border-0 hover:bg-slate-50 transition">
-                                        <td class="p-6 font-bold text-slate-700">${p.Title}</td>
-                                        <td class="p-6 text-right space-x-4">
-                                            <button onclick="openProductModal('${p.ID}')" class="text-blue-500 font-bold text-xs uppercase">Edit</button>
-                                            <button onclick="deleteProduct('${p.ID}')" class="text-red-400 font-bold text-xs uppercase">Delete</button>
-                                        </td>
-                                    </tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>`;
+        function applyGlobalTheme() {
+            const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
+            document.documentElement.style.setProperty('--p-color', dict.primary_color || '#0f172a');
+            if(dict.font_size) document.body.style.fontSize = dict.font_size + "px";
+            document.getElementById('site-name').innerText = dict.company_name || "WORKSMART";
+            const logoImg = document.getElementById('site-logo');
+            if(dict.logo_url && dict.logo_url.trim()) {
+                logoImg.src = dict.logo_url;
+                logoImg.classList.remove('hidden');
+            } else logoImg.classList.add('hidden');
+            const navDiv = document.getElementById('nav-links');
+            const menuItems = dict.menu_items ? dict.menu_items.split(',').map(m => m.trim()) : ['Home','Products','Contact'];
+            navDiv.innerHTML = menuItems.map(m => `<a href="#/" class="hover:dynamic-text transition">${m}</a>`).join('');
+            document.getElementById('footer-text').innerHTML = `&copy; ${dict.company_name || 'WorkSmart'} — ${dict.footer_tagline || 'Precision engineering for modern teams'}`;
+            if(dict.favicon_url) {
+                let link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+                link.type = 'image/x-icon';
+                link.rel = 'shortcut icon';
+                link.href = dict.favicon_url;
+                document.getElementsByTagName('head')[0].appendChild(link);
             }
         }
 
-        // ACTIONS
-        async function login() {
-            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', data: { username: document.getElementById('u').value, password: document.getElementById('p').value } }) });
-            const data = await res.json();
-            if(data.status === 'success') { localStorage.setItem('ws_token', data.token); router(); }
-            else alert("Access Denied");
-        }
-        function logout() { localStorage.removeItem('ws_token'); router(); }
-
-        async function saveSettings() {
-            const data = {
-                site_title: document.getElementById('set_title').value,
-                company_name: document.getElementById('set_name').value,
-                company_desc: document.getElementById('set_desc').value,
-                logo_url: document.getElementById('set_logo').value,
-                primary_color: document.getElementById('set_color').value,
-                font_size: document.getElementById('set_font').value,
-                menu_items: document.getElementById('set_menu').value
-            };
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateSettings', data: data }) });
-            location.reload();
+        function updateMetaTagsForRoute() {
+            const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
+            const hash = window.location.hash;
+            let title = dict.site_meta_title || dict.site_title || "WorkSmart CMS";
+            let description = dict.site_meta_description || dict.company_desc || "Next‑gen digital solutions.";
+            if(hash.startsWith('#/product/')) {
+                const prodId = hash.split('/')[2];
+                const product = store.products.find(p => p.ID == prodId);
+                if(product) {
+                    title = product.SEOTitle || product.Title;
+                    description = product.SEODesc || product.Summary;
+                }
+            }
+            document.title = title;
+            let metaDesc = document.querySelector('meta[name="description"]');
+            if(!metaDesc) { metaDesc = document.createElement('meta'); metaDesc.name = "description"; document.head.appendChild(metaDesc); }
+            metaDesc.content = description;
         }
 
-        /**
-         * OPEN PRODUCT MODAL (For both Add and Edit)
-         */
-        function openProductModal(id = null) {
-            const p = id ? store.products.find(x => x.ID == id) : { ID: '', Title: '', Thumbnail: '', Summary: '', Description: '', Technical_Info: '', SEO_Title: '', SEO_Desc: '' };
-            const html = `
-                <div id="modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-6">
-                    <div class="bg-white w-full max-w-4xl p-12 rounded-[3rem] max-h-[90vh] overflow-y-auto shadow-2xl">
-                        <h2 class="text-3xl font-black mb-10 italic tracking-tight">${id ? 'EDIT_ENTRY' : 'CREATE_ENTRY'}</h2>
-                        <input type="hidden" id="p_id" value="${p.ID}">
-                        <div class="grid md:grid-cols-2 gap-8">
-                            <div class="space-y-6">
-                                <input id="p_t" value="${p.Title}" placeholder="Product Title" class="w-full border-b py-3 outline-none font-bold text-xl">
-                                <input id="p_th" value="${p.Thumbnail}" placeholder="Thumbnail URL" class="w-full border-b py-3 outline-none">
-                                <textarea id="p_s" placeholder="Summary (Short Description)" class="w-full border-b py-3 outline-none h-24">${p.Summary}</textarea>
-                                <textarea id="p_te" placeholder="Tech Specs (List Format)" class="w-full border-b py-3 outline-none h-24">${p.Technical_Info}</textarea>
-                            </div>
-                            <div class="space-y-6">
-                                <textarea id="p_d" placeholder="Full Product Narrative" class="w-full border-b py-3 outline-none h-40">${p.Description}</textarea>
-                                <input id="p_st" value="${p.SEO_Title}" placeholder="SEO Search Title" class="w-full border-b py-3 outline-none">
-                                <input id="p_sd" value="${p.SEO_Desc}" placeholder="SEO Search Meta Description" class="w-full border-b py-3 outline-none">
-                            </div>
-                        </div>
-                        <div class="mt-12 flex gap-6">
-                            <button onclick="submitProduct()" class="dynamic-bg text-white px-12 py-5 rounded-2xl font-black shadow-xl">PUBLISH_CHANGES</button>
-                            <button onclick="document.getElementById('modal').remove()" class="bg-slate-100 px-12 py-5 rounded-2xl font-black text-slate-400">DISCARD</button>
+        // router
+        window.addEventListener('hashchange', () => { updateMetaTagsForRoute(); router(); });
+        window.addEventListener('load', async () => { await fetchData(); router(); });
+
+        async function router() {
+            const hash = window.location.hash || '#/';
+            const app = document.getElementById('app');
+            if(hash === '#/') renderHome(app);
+            else if(hash.startsWith('#/product/')) renderProductDetail(app, hash.split('/')[2]);
+            else if(hash === '#/admin-as') renderAdmin(app);
+            else renderHome(app);
+        }
+
+        // ======================== FRONTEND VIEWS ========================
+        function renderHome(container) {
+            const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
+            const filteredProducts = activeCategoryFilter === "all" ? store.products : store.products.filter(p => p.Category == activeCategoryFilter);
+            const categoriesList = store.categories.length ? store.categories : [{ID:"general", Name:"General"}];
+            
+            container.innerHTML = `
+                <!-- Hero Section -->
+                <section class="hero-gradient rounded-[3rem] p-8 md:p-20 my-8 text-center md:text-left">
+                    <div class="max-w-4xl mx-auto">
+                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter dynamic-text mb-6 leading-[1.1]">${dict.site_title || 'WorkSmart Ecosystem'}</h1>
+                        <p class="text-xl text-slate-500 max-w-2xl mx-auto md:mx-0 leading-relaxed">${dict.company_moto || dict.company_desc || 'Streamline, automate, and scale with intelligent tools.'}</p>
+                        <div class="mt-10 flex flex-wrap gap-4 justify-center md:justify-start">
+                            <a href="#/admin-as" class="dynamic-bg text-white px-8 py-4 rounded-full font-bold tracking-wide shadow-xl hover:shadow-2xl transition">Launch Console</a>
                         </div>
                     </div>
-                </div>`;
+                </section>
+
+                <!-- How it works / Philosophy -->
+                <div class="my-24 grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <span class="text-xs font-black uppercase tracking-wider dynamic-text">● methodology</span>
+                        <h2 class="text-4xl font-black mt-3 mb-6 tracking-tight">How it <span class="dynamic-text">works</span></h2>
+                        <div class="prose prose-lg text-slate-500">${dict.how_it_works || '<p>Real‑time sync, headless architecture, and zero‑maintenance infrastructure. Your data flows from Google Sheets to a beautiful frontend in milliseconds.</p>'}</div>
+                    </div>
+                    <div class="bg-white/60 rounded-[2rem] p-8 border shadow-sm">
+                        <div class="text-6xl mb-4">⚡</div>
+                        <h3 class="font-bold text-2xl">Zero‑cost cloud</h3>
+                        <p class="text-slate-500 mt-2">Fully hosted on GitHub Pages + Google Apps Script, enterprise-ready performance.</p>
+                    </div>
+                </div>
+
+                <!-- Category filters -->
+                <div class="my-12 flex flex-wrap gap-3 justify-center border-t border-b py-6 border-slate-100">
+                    <button data-cat="all" class="category-pill px-6 py-2 rounded-full text-sm font-bold bg-slate-100 hover:dynamic-bg hover:text-white transition">ALL</button>
+                    ${categoriesList.map(cat => `<button data-cat="${cat.ID}" class="category-pill px-6 py-2 rounded-full text-sm font-bold bg-slate-100 hover:dynamic-bg hover:text-white transition">${cat.Name.toUpperCase()}</button>`).join('')}
+                </div>
+
+                <!-- Product Grid -->
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-10 mt-8">
+                    ${filteredProducts.length ? filteredProducts.map(p => `
+                        <div class="bg-white rounded-3xl overflow-hidden shadow-md card-hover cursor-pointer group border border-slate-100 transition-all" onclick="location.hash='#/product/${p.ID}'">
+                            <div class="relative h-64 overflow-hidden">
+                                <img src="${p.Thumbnail || 'https://placehold.co/600x400?text=WorkSmart'}" class="w-full h-full object-cover group-hover:scale-105 transition duration-700">
+                            </div>
+                            <div class="p-8">
+                                <div class="text-xs dynamic-text font-black mb-2 uppercase tracking-wider">${p.Category || 'General'}</div>
+                                <h3 class="text-2xl font-extrabold tracking-tight mb-3">${p.Title}</h3>
+                                <p class="text-slate-500 text-sm line-clamp-2">${p.Summary}</p>
+                            </div>
+                        </div>
+                    `).join('') : `<div class="col-span-full text-center py-20 text-slate-400">✨ No products in this category. Add from admin panel.</div>`}
+                </div>
+            `;
+            // attach category filter events
+            document.querySelectorAll('[data-cat]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    activeCategoryFilter = btn.getAttribute('data-cat');
+                    renderHome(container);
+                });
+                if(activeCategoryFilter === btn.getAttribute('data-cat')) btn.classList.add('active', 'dynamic-bg', 'text-white');
+                else btn.classList.remove('active', 'dynamic-bg', 'text-white');
+            });
+        }
+
+        function renderProductDetail(container, id) {
+            const product = store.products.find(p => p.ID == id);
+            if(!product) { container.innerHTML = `<div class='text-center py-32 text-red-400'>Product not found</div>`; return; }
+            const imagesArr = product.Images ? product.Images.split(',').map(i => i.trim()) : (product.Thumbnail ? [product.Thumbnail] : []);
+            const swiperId = `swiper-${Date.now()}`;
+            container.innerHTML = `
+                <div class="max-w-6xl mx-auto py-8">
+                    <button onclick="history.back()" class="mb-8 flex items-center gap-2 text-slate-400 hover:dynamic-text text-sm font-bold transition">← Back to home</button>
+                    <div class="grid lg:grid-cols-2 gap-12 items-start">
+                        <!-- Carousel Section -->
+                        <div class="relative rounded-2xl overflow-hidden shadow-2xl">
+                            <div class="swiper ${swiperId} rounded-2xl">
+                                <div class="swiper-wrapper">
+                                    ${imagesArr.map(img => `<div class="swiper-slide"><img src="${img}" class="w-full h-[450px] object-cover"></div>`).join('')}
+                                </div>
+                                <div class="swiper-button-next"></div>
+                                <div class="swiper-button-prev"></div>
+                                <div class="swiper-pagination"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-7">
+                            <h1 class="text-5xl font-black tracking-tight dynamic-text">${product.Title}</h1>
+                            <div class="bg-white/70 p-6 rounded-2xl border border-slate-100">
+                                <h4 class="text-xs font-black dynamic-text uppercase tracking-wider">⚙️ Technical Specifications</h4>
+                                <div class="mt-4 text-slate-600 text-sm leading-relaxed whitespace-pre-line">${product.Technical_Info || 'Advanced engineering datasheet available on request.'}</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2"><span class="text-xs bg-slate-100 px-3 py-1 rounded-full">${product.Category}</span></div>
+                        </div>
+                    </div>
+                    <!-- Description + Legal -->
+                    <div class="mt-20 grid md:grid-cols-2 gap-10">
+                        <div class="bg-white p-8 rounded-3xl shadow-sm border">
+                            <h3 class="text-2xl font-bold mb-4">📘 Description</h3>
+                            <div class="text-slate-600 leading-relaxed whitespace-pre-line">${product.Description || 'No extended description provided.'}</div>
+                        </div>
+                        <div class="space-y-8">
+                            ${product.Terms ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">📜 Terms of Service</h3><div class="text-slate-500 text-sm">${product.Terms}</div></div>` : ''}
+                            ${product.Privacy ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">🔒 Privacy Policy</h3><div class="text-slate-500 text-sm">${product.Privacy}</div></div>` : ''}
+                            ${product.ServiceCommitment ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">🤝 Service Commitment</h3><div class="text-slate-500 text-sm">${product.ServiceCommitment}</div></div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            setTimeout(() => {
+                new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, loop: imagesArr.length > 1, effect: 'slide' });
+            }, 50);
+        }
+
+        // ======================== ADMIN PANEL ========================
+        function renderAdmin(container) {
+            const token = localStorage.getItem('ws_token');
+            if(!token) {
+                container.innerHTML = `<div class="max-w-md mx-auto bg-white/80 backdrop-blur-sm p-12 rounded-[3rem] shadow-2xl mt-20 border"><h2 class="text-3xl font-black mb-8 text-center">ADMIN ACCESS</h2><input id="adminUser" class="w-full border-b py-4 mb-5 outline-none" placeholder="Username"><input id="adminPass" type="password" class="w-full border-b py-4 mb-8 outline-none" placeholder="Password"><button onclick="adminLogin()" class="w-full dynamic-bg text-white py-4 rounded-2xl font-black tracking-wider">UNLOCK PANEL</button></div>`;
+                return;
+            }
+            const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
+            // render full admin suite
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-8 flex-wrap gap-4"><h2 class="text-4xl font-black tracking-tighter">⚡ ADMIN WORKSPACE</h2><button onclick="adminLogout()" class="text-xs font-bold text-red-500 border border-red-200 px-5 py-2 rounded-full hover:bg-red-50">LOGOUT</button></div>
+                <div class="grid lg:grid-cols-3 gap-8 mb-12">
+                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">🏢 Brand & Content</h3><label class="text-xs uppercase font-bold">Site Title</label><input id="site_title" value="${dict.site_title || ''}" class="w-full border rounded-xl p-3 mb-3"><label>Company Name</label><input id="company_name" value="${dict.company_name || ''}" class="w-full border rounded-xl p-3 mb-3"><label>Moto / Tagline</label><textarea id="company_moto" class="w-full border rounded-xl p-3">${dict.company_moto || ''}</textarea><label>How it works</label><textarea id="how_it_works" class="w-full border rounded-xl p-3 h-28">${dict.how_it_works || ''}</textarea><label>Logo URL</label><input id="logo_url" value="${dict.logo_url || ''}" class="w-full border rounded-xl p-3 mb-2"></div>
+                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">🎨 Theme & SEO</h3><label>Primary Color</label><input type="color" id="primary_color" value="${dict.primary_color || '#0f172a'}" class="w-full h-12 mb-3"><label>Font size (px)</label><input id="font_size" type="number" value="${dict.font_size || '16'}" class="w-full border rounded-xl p-3 mb-3"><label>Menu items (comma)</label><input id="menu_items" value="${dict.menu_items || 'Home, Products, Solutions'}" class="w-full border rounded-xl p-3 mb-3"><label>Favicon URL</label><input id="favicon_url" value="${dict.favicon_url || ''}" class="w-full border rounded-xl p-3"><label>Site Meta Title</label><input id="site_meta_title" value="${dict.site_meta_title || ''}" class="w-full border rounded-xl p-3 mt-2"><label>Site Meta Description</label><textarea id="site_meta_description" class="w-full border rounded-xl p-3">${dict.site_meta_description || ''}</textarea></div>
+                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">📦 Quick Actions</h3><button onclick="saveAllSettings()" class="w-full dynamic-bg text-white py-3 rounded-xl font-bold mb-4">💾 SAVE ALL SETTINGS</button><button onclick="openProductModal()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">+ ADD NEW PRODUCT</button><hr class="my-6"><button onclick="manageCategoriesUI()" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">📂 MANAGE CATEGORIES</button></div>
+                </div>
+                <div class="bg-white rounded-3xl shadow-lg overflow-hidden"><div class="p-6 border-b"><h3 class="text-2xl font-black">📦 PRODUCT INVENTORY</h3></div><table class="w-full text-left"><thead class="bg-slate-50"><tr><th class="p-5">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-5 font-bold">${p.Title}</td><td>${p.Category || '—'}</td><td class="p-5 text-right space-x-3"><button onclick="openProductModal('${p.ID}')" class="text-blue-600 text-xs font-black uppercase">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500 text-xs font-black uppercase">Delete</button></td></tr>`).join('')}</tbody></table></div>
+            `;
+        }
+
+        // categories management popup
+        window.manageCategoriesUI = async () => {
+            const cats = store.categories || [];
+            const html = `<div id="catModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-md rounded-3xl p-6"><h3 class="text-2xl font-black mb-4">Manage Categories</h3><div id="catList" class="max-h-64 overflow-y-auto space-y-2 mb-4">${cats.map(c => `<div class="flex justify-between items-center border-b py-2"><span>${c.Name}</span><button onclick="deleteCategory('${c.ID}')" class="text-red-400 text-xs">Delete</button></div>`).join('')}</div><div class="flex gap-2"><input id="newCatName" placeholder="New category name" class="flex-1 border rounded-xl p-2"><button onclick="addNewCategory()" class="dynamic-bg text-white px-5 py-2 rounded-xl">Add</button></div><button onclick="closeCatModal()" class="mt-4 w-full border py-2 rounded-xl">Close</button></div></div>`;
             document.body.insertAdjacentHTML('beforeend', html);
-        }
-
-        async function submitProduct() {
+        };
+        window.closeCatModal = () => document.getElementById('catModal')?.remove();
+        window.addNewCategory = async () => {
+            const name = document.getElementById('newCatName').value.trim();
+            if(!name) return;
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveCategory', data: { id: null, name } }) });
+            location.reload();
+        };
+        window.deleteCategory = async (id) => { if(confirm('Delete category? Products will remain but category unassigned.')) { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteCategory', data: { id } }) }); location.reload(); } };
+        
+        // product modal (enhanced with images array, terms, privacy, service commitment)
+        window.openProductModal = (id = null) => {
+            const prod = id ? store.products.find(p => p.ID == id) : { ID: '', Title: '', Thumbnail: '', Images: '', Summary: '', Description: '', Technical_Info: '', Terms: '', Privacy: '', ServiceCommitment: '', SEOTitle: '', SEODesc: '', Category: store.categories[0]?.ID || '' };
+            const categoriesOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category == c.ID ? 'selected' : ''}>${c.Name}</option>`).join('');
+            const imagesVal = prod.Images || '';
+            const modalHtml = `
+                <div id="productModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 overflow-auto">
+                    <div class="bg-white w-full max-w-4xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
+                        <h2 class="text-3xl font-black mb-6">${id ? '✏️ EDIT PRODUCT' : '✨ CREATE PRODUCT'}</h2>
+                        <input type="hidden" id="prod_id" value="${prod.ID}">
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div><label class="text-xs font-black">Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border p-3 rounded-xl mb-3"><label>Category</label><select id="prod_cat" class="w-full border p-3 rounded-xl mb-3">${categoriesOptions}</select><label>Thumbnail URL</label><input id="prod_thumb" value="${prod.Thumbnail || ''}" class="w-full border p-3 rounded-xl mb-3"><label>Images (comma separated URLs for carousel)</label><textarea id="prod_images" class="w-full border p-3 rounded-xl h-20">${imagesVal}</textarea><label>Summary (short)</label><textarea id="prod_summary" class="w-full border p-3 rounded-xl h-24">${escapeHtml(prod.Summary || '')}</textarea></div>
+                            <div><label>Full Description</label><textarea id="prod_desc" class="w-full border p-3 rounded-xl h-32">${escapeHtml(prod.Description || '')}</textarea><label>Technical Info</label><textarea id="prod_tech" class="w-full border p-3 rounded-xl h-28">${escapeHtml(prod.Technical_Info || '')}</textarea><label>Terms of Service</label><textarea id="prod_terms" class="w-full border p-3 rounded-xl h-24">${escapeHtml(prod.Terms || '')}</textarea><label>Privacy Policy</label><textarea id="prod_privacy" class="w-full border p-3 rounded-xl h-24">${escapeHtml(prod.Privacy || '')}</textarea><label>Service Commitment</label><textarea id="prod_service" class="w-full border p-3 rounded-xl h-24">${escapeHtml(prod.ServiceCommitment || '')}</textarea><label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle || '')}" class="w-full border p-3 rounded-xl mt-2"><label>SEO Description</label><textarea id="prod_seod" class="w-full border p-3 rounded-xl">${escapeHtml(prod.SEODesc || '')}</textarea></div>
+                        </div>
+                        <div class="flex gap-4 mt-8"><button onclick="submitProductForm()" class="dynamic-bg text-white px-10 py-3 rounded-xl font-bold">PUBLISH</button><button onclick="closeModal()" class="bg-slate-100 px-8 py-3 rounded-xl">Cancel</button></div>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        };
+        window.submitProductForm = async () => {
             const data = {
-                id: document.getElementById('p_id').value,
-                title: document.getElementById('p_t').value,
-                thumb: document.getElementById('p_th').value,
-                summary: document.getElementById('p_s').value,
-                tech: document.getElementById('p_te').value,
-                desc: document.getElementById('p_d').value,
-                seoT: document.getElementById('p_st').value,
-                seoD: document.getElementById('p_sd').value
+                id: document.getElementById('prod_id').value,
+                catId: document.getElementById('prod_cat').value,
+                title: document.getElementById('prod_title').value,
+                thumb: document.getElementById('prod_thumb').value,
+                imgs: document.getElementById('prod_images').value,
+                summary: document.getElementById('prod_summary').value,
+                desc: document.getElementById('prod_desc').value,
+                tech: document.getElementById('prod_tech').value,
+                terms: document.getElementById('prod_terms').value,
+                privacy: document.getElementById('prod_privacy').value,
+                serviceCommitment: document.getElementById('prod_service').value,
+                seoT: document.getElementById('prod_seot').value,
+                seoD: document.getElementById('prod_seod').value
             };
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveProduct', data: data }) });
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveProduct', data }) });
             location.reload();
-        }
-
-        async function deleteProduct(id) {
-            if(!confirm("Erase entry?")) return;
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: {id} }) });
+        };
+        window.deleteProductItem = async (id) => { if(confirm('Permanently delete?')) { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: { id } }) }); location.reload(); } };
+        window.saveAllSettings = async () => {
+            const settings = {
+                site_title: document.getElementById('site_title')?.value, company_name: document.getElementById('company_name')?.value, company_moto: document.getElementById('company_moto')?.value, how_it_works: document.getElementById('how_it_works')?.value, logo_url: document.getElementById('logo_url')?.value, primary_color: document.getElementById('primary_color')?.value, font_size: document.getElementById('font_size')?.value, menu_items: document.getElementById('menu_items')?.value, favicon_url: document.getElementById('favicon_url')?.value, site_meta_title: document.getElementById('site_meta_title')?.value, site_meta_description: document.getElementById('site_meta_description')?.value
+            };
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateSettings', data: settings }) });
             location.reload();
-        }
+        };
+        window.closeModal = () => document.getElementById('productModal')?.remove();
+        window.adminLogin = async () => {
+            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', data: { username: document.getElementById('adminUser').value, password: document.getElementById('adminPass').value } }) });
+            const json = await res.json();
+            if(json.status === 'success') { localStorage.setItem('ws_token', json.token); router(); } else alert('Invalid credentials');
+        };
+        window.adminLogout = () => { localStorage.removeItem('ws_token'); router(); };
+        function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
     </script>
 </body>
 </html>
