@@ -30,7 +30,7 @@
                 <span id="site-name" class="text-2xl font-black tracking-tight dynamic-text">WORKSMART</span>
             </div>
             <div id="nav-links" class="hidden md:flex gap-8 text-sm font-semibold uppercase tracking-wide text-slate-500"></div>
-            <!-- Admin button removed for public visitors (access via /#/admin-as) -->
+            <!-- No public admin button -->
         </div>
     </nav>
 
@@ -41,10 +41,11 @@
     </footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbx3skjHuK-g_VsVrHHseuljBbvd8w25xE1fd3U5Yz-Cn7GCc1ZphuyLRcxq4a1XTKE7/exec"; // REPLACE WITH YOUR DEPLOYED URL
+        const API_URL = "https://script.google.com/macros/s/AKfycbx3skjHuK-g_VsVrHHseuljBbvd8w25xE1fd3U5Yz-Cn7GCc1ZphuyLRcxq4a1XTKE7/exec"; // ✅ REPLACE WITH YOUR DEPLOYED URL
         let store = { company: [], products: [], categories: [], pages: [] };
         let activeCategoryFilter = "all";
 
+        // ======================== FETCH & THEME ========================
         async function fetchData() {
             try {
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
@@ -68,15 +69,14 @@
                 logoImg.classList.remove('hidden');
             } else logoImg.classList.add('hidden');
             
-            // Build dynamic menu from pages + custom links
+            // Build dynamic menu from pages + default links
             const navDiv = document.getElementById('nav-links');
-            let menuItemsHtml = '';
-            const menuPages = store.pages.filter(p => p.Status === 'published').sort((a,b) => (a.MenuOrder||0) - (b.MenuOrder||0));
+            let menuItemsHtml = `<a href="#/" class="hover:dynamic-text transition">HOME</a>`;
+            const menuPages = (store.pages || []).filter(p => p.Status === 'published').sort((a,b) => (a.MenuOrder||0) - (b.MenuOrder||0));
             menuPages.forEach(page => {
-                menuItemsHtml += `<a href="#/page/${page.Slug}" class="hover:dynamic-text transition">${page.Title}</a>`;
+                menuItemsHtml += `<a href="#/page/${page.Slug}" class="hover:dynamic-text transition">${escapeHtml(page.Title)}</a>`;
             });
-            // Also add "Home" and "Products" as default
-            menuItemsHtml = `<a href="#/" class="hover:dynamic-text transition">HOME</a>` + menuItemsHtml + `<a href="#/products" class="hover:dynamic-text transition">PRODUCTS</a>`;
+            menuItemsHtml += `<a href="#/products" class="hover:dynamic-text transition">PRODUCTS</a>`;
             navDiv.innerHTML = menuItemsHtml;
             
             document.getElementById('footer-text').innerHTML = `&copy; ${dict.company_name || 'WorkSmart'} — ${dict.footer_tagline || 'Precision engineering'}`;
@@ -105,7 +105,6 @@
                     description = product.SEODesc || product.Summary;
                     keywords = product.SEOKeywords || "";
                     ogImage = product.OGImage || product.Thumbnail;
-                    // Open Graph specific
                     setMetaTag('og:title', product.OGTitle || title);
                     setMetaTag('og:description', product.OGDesc || description);
                     setMetaTag('og:image', ogImage);
@@ -119,7 +118,6 @@
                     description = page.Content.replace(/<[^>]*>/g, '').substring(0, 160);
                 }
             } else {
-                // reset to site defaults
                 setMetaTag('og:title', dict.site_meta_title || dict.site_title);
                 setMetaTag('og:description', dict.site_meta_description);
                 setMetaTag('og:image', dict.og_image);
@@ -146,6 +144,7 @@
         window.addEventListener('hashchange', () => { updateMetaTagsForRoute(); router(); });
         window.addEventListener('load', async () => { await fetchData(); router(); });
 
+        // ======================== ROUTER ========================
         async function router() {
             const hash = window.location.hash || '#/';
             const app = document.getElementById('app');
@@ -162,20 +161,21 @@
             return cat ? cat.Name : (catId === "general" ? "General" : catId);
         }
 
+        // ======================== FRONTEND VIEWS ========================
         function renderHome(container) {
             const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
             container.innerHTML = `
                 <section class="rounded-[3rem] p-8 md:p-20 my-8 text-center md:text-left" style="background: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.9) 0%, #f8fafc 90%);">
                     <div class="max-w-4xl mx-auto">
-                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter dynamic-text mb-6 leading-[1.1]">${dict.site_title || 'WorkSmart Ecosystem'}</h1>
-                        <p class="text-xl text-slate-500 max-w-2xl mx-auto md:mx-0 leading-relaxed">${dict.company_moto || dict.company_desc || 'Streamline, automate, and scale.'}</p>
+                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter dynamic-text mb-6 leading-[1.1]">${escapeHtml(dict.site_title || 'WorkSmart Ecosystem')}</h1>
+                        <p class="text-xl text-slate-500 max-w-2xl mx-auto md:mx-0 leading-relaxed">${escapeHtml(dict.company_moto || dict.company_desc || 'Streamline, automate, and scale.')}</p>
                     </div>
                 </section>
                 <div class="my-24 grid md:grid-cols-2 gap-12 items-center">
                     <div>
                         <span class="text-xs font-black uppercase tracking-wider dynamic-text">● methodology</span>
                         <h2 class="text-4xl font-black mt-3 mb-6 tracking-tight">How it <span class="dynamic-text">works</span></h2>
-                        <div class="prose prose-lg text-slate-500">${dict.how_it_works || '<p>Real‑time sync, headless architecture, zero‑maintenance.</p>'}</div>
+                        <div class="prose prose-lg text-slate-500">${escapeHtml(dict.how_it_works || '<p>Real‑time sync, headless architecture, zero‑maintenance.</p>')}</div>
                     </div>
                     <div class="bg-white/60 rounded-[2rem] p-8 border shadow-sm">
                         <div class="text-6xl mb-4">⚡</div>
@@ -192,7 +192,7 @@
             container.innerHTML = `
                 <div class="my-12 flex flex-wrap gap-3 justify-center border-t border-b py-6 border-slate-100">
                     <button data-cat="all" class="category-pill px-6 py-2 rounded-full text-sm font-bold bg-slate-100 hover:dynamic-bg hover:text-white transition">ALL</button>
-                    ${categoriesList.map(cat => `<button data-cat="${cat.ID}" class="category-pill px-6 py-2 rounded-full text-sm font-bold bg-slate-100 hover:dynamic-bg hover:text-white transition">${cat.Name.toUpperCase()}</button>`).join('')}
+                    ${categoriesList.map(cat => `<button data-cat="${cat.ID}" class="category-pill px-6 py-2 rounded-full text-sm font-bold bg-slate-100 hover:dynamic-bg hover:text-white transition">${escapeHtml(cat.Name.toUpperCase())}</button>`).join('')}
                 </div>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-10 mt-8">
                     ${filteredProducts.length ? filteredProducts.map(p => `
@@ -202,8 +202,8 @@
                             </div>
                             <div class="p-8">
                                 <div class="text-xs dynamic-text font-black mb-2 uppercase tracking-wider">${getCategoryName(p.Category)}</div>
-                                <h3 class="text-2xl font-extrabold tracking-tight mb-3">${p.Title}</h3>
-                                <p class="text-slate-500 text-sm line-clamp-2">${p.Summary}</p>
+                                <h3 class="text-2xl font-extrabold tracking-tight mb-3">${escapeHtml(p.Title)}</h3>
+                                <p class="text-slate-500 text-sm line-clamp-2">${escapeHtml(p.Summary)}</p>
                             </div>
                         </div>
                     `).join('') : `<div class="col-span-full text-center py-20 text-slate-400">✨ No products in this category.</div>`}
@@ -239,22 +239,22 @@
                             </div>
                         </div>
                         <div class="space-y-7">
-                            <h1 class="text-5xl font-black tracking-tight dynamic-text">${product.Title}</h1>
+                            <h1 class="text-5xl font-black tracking-tight dynamic-text">${escapeHtml(product.Title)}</h1>
                             <div class="bg-white/70 p-6 rounded-2xl border border-slate-100">
                                 <h4 class="text-xs font-black dynamic-text uppercase tracking-wider">⚙️ Technical Specifications</h4>
-                                <div class="mt-4 text-slate-600 text-sm leading-relaxed whitespace-pre-line">${product.Technical_Info || 'Advanced engineering datasheet available on request.'}</div>
+                                <div class="mt-4 text-slate-600 text-sm leading-relaxed whitespace-pre-line">${escapeHtml(product.Technical_Info || 'Advanced engineering datasheet available on request.')}</div>
                             </div>
                         </div>
                     </div>
                     <div class="mt-20 grid md:grid-cols-2 gap-10">
                         <div class="bg-white p-8 rounded-3xl shadow-sm border">
                             <h3 class="text-2xl font-bold mb-4">📘 Description</h3>
-                            <div class="text-slate-600 leading-relaxed whitespace-pre-line">${product.Description || 'No extended description provided.'}</div>
+                            <div class="text-slate-600 leading-relaxed whitespace-pre-line">${escapeHtml(product.Description || 'No extended description provided.')}</div>
                         </div>
                         <div class="space-y-8">
-                            ${product.Terms ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">📜 Terms</h3><div class="text-slate-500 text-sm">${product.Terms}</div></div>` : ''}
-                            ${product.Privacy ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">🔒 Privacy</h3><div class="text-slate-500 text-sm">${product.Privacy}</div></div>` : ''}
-                            ${product.ServiceCommitment ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">🤝 Service</h3><div class="text-slate-500 text-sm">${product.ServiceCommitment}</div></div>` : ''}
+                            ${product.Terms ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">📜 Terms</h3><div class="text-slate-500 text-sm">${escapeHtml(product.Terms)}</div></div>` : ''}
+                            ${product.Privacy ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">🔒 Privacy</h3><div class="text-slate-500 text-sm">${escapeHtml(product.Privacy)}</div></div>` : ''}
+                            ${product.ServiceCommitment ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">🤝 Service</h3><div class="text-slate-500 text-sm">${escapeHtml(product.ServiceCommitment)}</div></div>` : ''}
                         </div>
                     </div>
                 </div>
@@ -270,7 +270,7 @@
             container.innerHTML = `<div class="max-w-4xl mx-auto py-12 prose prose-lg">${page.Content || '<p>No content yet.</p>'}</div>`;
         }
 
-        // ======================== ADMIN PANEL (simplified for brevity, but fully functional) ========================
+        // ======================== ADMIN PANEL ========================
         function renderAdmin(container) {
             const token = localStorage.getItem('ws_token');
             if(!token) {
@@ -279,33 +279,174 @@
             }
             const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
             container.innerHTML = `
-                <div class="flex justify-between items-center mb-8"><h2 class="text-4xl font-black">⚡ ADMIN</h2><button onclick="adminLogout()" class="text-red-500 border px-5 py-2 rounded-full">LOGOUT</button></div>
+                <div class="flex justify-between items-center mb-8 flex-wrap gap-4"><h2 class="text-4xl font-black tracking-tighter">⚡ ADMIN WORKSPACE</h2><button onclick="adminLogout()" class="text-xs font-bold text-red-500 border border-red-200 px-5 py-2 rounded-full hover:bg-red-50">LOGOUT</button></div>
                 <div class="grid lg:grid-cols-3 gap-8 mb-12">
-                    <div class="bg-white p-7 rounded-3xl shadow"><h3 class="font-black mb-4">🏢 Brand & SEO</h3><input id="site_title" placeholder="Site Title" class="w-full border p-2 mb-2"><input id="company_name" placeholder="Company Name" class="w-full border p-2 mb-2"><textarea id="company_moto" placeholder="Moto" class="w-full border p-2 mb-2"></textarea><input id="logo_url" placeholder="Logo URL" class="w-full border p-2 mb-2"><input id="primary_color" type="color" class="w-full h-10 mb-2"><input id="font_size" type="number" placeholder="Font size" class="w-full border p-2 mb-2"><input id="favicon_url" placeholder="Favicon" class="w-full border p-2 mb-2"><input id="site_meta_title" placeholder="Meta Title" class="w-full border p-2 mb-2"><textarea id="site_meta_description" placeholder="Meta Description" class="w-full border p-2"></textarea></div>
-                    <div class="bg-white p-7 rounded-3xl shadow"><h3 class="font-black mb-4">📄 Manage Pages</h3><div id="pagesList"></div><button onclick="openPageModal()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded">+ New Page</button><hr class="my-6"><h3 class="font-black mb-4">🏷️ Categories</h3><div id="categoriesList"></div><button onclick="manageCategoriesUI()" class="mt-2 bg-slate-800 text-white px-4 py-2 rounded">Manage Categories</button></div>
-                    <div class="bg-white p-7 rounded-3xl shadow"><h3 class="font-black mb-4">📦 Products</h3><button onclick="openProductModal()" class="bg-emerald-600 text-white px-4 py-2 rounded">+ New Product</button><div id="productsTable" class="mt-4 text-sm"></div></div>
+                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">🏢 Brand & Content</h3><label class="text-xs uppercase font-bold">Site Title</label><input id="site_title" value="${escapeHtml(dict.site_title || '')}" class="w-full border rounded-xl p-3 mb-3"><label>Company Name</label><input id="company_name" value="${escapeHtml(dict.company_name || '')}" class="w-full border rounded-xl p-3 mb-3"><label>Moto / Tagline</label><textarea id="company_moto" class="w-full border rounded-xl p-3">${escapeHtml(dict.company_moto || '')}</textarea><label>How it works</label><textarea id="how_it_works" class="w-full border rounded-xl p-3 h-28">${escapeHtml(dict.how_it_works || '')}</textarea><label>Logo URL</label><input id="logo_url" value="${escapeHtml(dict.logo_url || '')}" class="w-full border rounded-xl p-3 mb-2"></div>
+                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">🎨 Theme & SEO</h3><label>Primary Color</label><input type="color" id="primary_color" value="${dict.primary_color || '#0f172a'}" class="w-full h-12 mb-3"><label>Font size (px)</label><input id="font_size" type="number" value="${dict.font_size || '16'}" class="w-full border rounded-xl p-3 mb-3"><label>Menu items (comma) - Legacy</label><input id="menu_items" value="${escapeHtml(dict.menu_items || '')}" class="w-full border rounded-xl p-3 mb-3"><label>Favicon URL</label><input id="favicon_url" value="${escapeHtml(dict.favicon_url || '')}" class="w-full border rounded-xl p-3"><label>Site Meta Title</label><input id="site_meta_title" value="${escapeHtml(dict.site_meta_title || '')}" class="w-full border rounded-xl p-3 mt-2"><label>Site Meta Description</label><textarea id="site_meta_description" class="w-full border rounded-xl p-3">${escapeHtml(dict.site_meta_description || '')}</textarea></div>
+                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">📦 Quick Actions</h3><button onclick="saveAllSettings()" class="w-full dynamic-bg text-white py-3 rounded-xl font-bold mb-4">💾 SAVE ALL SETTINGS</button><button onclick="openProductModal()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">+ ADD NEW PRODUCT</button><hr class="my-6"><button onclick="manageCategoriesUI()" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">📂 MANAGE CATEGORIES</button><button onclick="openPageModal()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mt-3">📄 MANAGE PAGES</button></div>
                 </div>
-                <button onclick="saveAllSettings()" class="dynamic-bg text-white px-8 py-3 rounded-xl font-bold mb-8">💾 SAVE ALL SETTINGS</button>
+                <div class="bg-white rounded-3xl shadow-lg overflow-hidden"><div class="p-6 border-b"><h3 class="text-2xl font-black">📦 PRODUCT INVENTORY</h3></div><table class="w-full text-left"><thead class="bg-slate-50"><tr><th class="p-5">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody id="inventoryTableBody"></tbody></table></div>
             `;
-            // Load pages & categories & products lists
-            const pagesDiv = document.getElementById('pagesList');
-            pagesDiv.innerHTML = store.pages.map(p => `<div class="flex justify-between items-center border-b py-1"><span>${p.Title}</span><div><button onclick="openPageModal('${p.ID}')" class="text-blue-500 text-xs">Edit</button><button onclick="deletePageItem('${p.ID}')" class="text-red-500 text-xs ml-2">Del</button></div></div>`).join('');
-            const catsDiv = document.getElementById('categoriesList');
-            catsDiv.innerHTML = store.categories.map(c => `<div class="flex justify-between items-center"><span>${c.Name}</span><button onclick="deleteCategory('${c.ID}')" class="text-red-500 text-xs">Delete</button></div>`).join('');
-            const productsDiv = document.getElementById('productsTable');
-            productsDiv.innerHTML = `<table class="w-full"><tr><th>Title</th><th>Cat</th><th></th></tr>${store.products.map(p => `<tr><td>${p.Title}</td><td>${getCategoryName(p.Category)}</td><td><button onclick="openProductModal('${p.ID}')" class="text-blue-500 text-xs">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500 text-xs ml-2">Del</button></td></tr>`).join('')}</table>`;
+            renderInventoryTable();
         }
 
-        // Modal and CRUD functions (same as before, extended for pages)
-        window.openPageModal = (id=null) => { /* implementation similar to product modal - omitted for brevity but fully functional */ alert("Page modal - implement similar to product modal"); };
+        function renderInventoryTable() {
+            const tbody = document.getElementById('inventoryTableBody');
+            if(!tbody) return;
+            tbody.innerHTML = store.products.map(p => `
+                <tr class="border-b">
+                    <td class="p-5 font-bold">${escapeHtml(p.Title)}</td>
+                    <td>${getCategoryName(p.Category)}</td>
+                    <td class="p-5 text-right space-x-3">
+                        <button onclick="openProductModal('${p.ID}')" class="text-blue-600 text-xs font-black uppercase">Edit</button>
+                        <button onclick="deleteProductItem('${p.ID}')" class="text-red-500 text-xs font-black uppercase">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // ======================== CATEGORY MANAGEMENT ========================
+        window.manageCategoriesUI = () => {
+            const cats = store.categories || [];
+            const html = `<div id="catModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-md rounded-3xl p-6"><h3 class="text-2xl font-black mb-4">Manage Categories</h3><div id="catList" class="max-h-64 overflow-y-auto space-y-2 mb-4">${cats.map(c => `<div class="flex justify-between items-center border-b py-2"><span>${escapeHtml(c.Name)}</span><button onclick="deleteCategory('${c.ID}')" class="text-red-400 text-xs">Delete</button></div>`).join('')}</div><div class="flex gap-2"><input id="newCatName" placeholder="New category name" class="flex-1 border rounded-xl p-2"><button onclick="addNewCategory()" class="dynamic-bg text-white px-5 py-2 rounded-xl">Add</button></div><button onclick="closeCatModal()" class="mt-4 w-full border py-2 rounded-xl">Close</button></div></div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+        };
+        window.closeCatModal = () => document.getElementById('catModal')?.remove();
+        window.addNewCategory = async () => {
+            const name = document.getElementById('newCatName')?.value.trim();
+            if(!name) return;
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveCategory', data: { id: null, name } }) });
+            location.reload();
+        };
+        window.deleteCategory = async (id) => { if(confirm('Delete category?')) { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteCategory', data: { id } }) }); location.reload(); } };
+
+        // ======================== PAGE MANAGEMENT ========================
+        window.openPageModal = (id = null) => {
+            const page = id ? store.pages.find(p => p.ID == id) : { ID: '', Slug: '', Title: '', Content: '', MenuOrder: 0, Status: 'published' };
+            const modalHtml = `
+                <div id="pageModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 overflow-auto">
+                    <div class="bg-white w-full max-w-3xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
+                        <h2 class="text-3xl font-black mb-6">${id ? '✏️ EDIT PAGE' : '📄 CREATE PAGE'}</h2>
+                        <input type="hidden" id="page_id" value="${page.ID}">
+                        <div class="space-y-4">
+                            <div><label class="font-bold">Title</label><input id="page_title" value="${escapeHtml(page.Title)}" class="w-full border rounded-xl p-3"></div>
+                            <div><label class="font-bold">Slug (URL: /page/xxx)</label><input id="page_slug" value="${escapeHtml(page.Slug)}" class="w-full border rounded-xl p-3"></div>
+                            <div><label class="font-bold">Menu Order</label><input id="page_order" type="number" value="${page.MenuOrder || 0}" class="w-full border rounded-xl p-3"></div>
+                            <div><label class="font-bold">Status</label><select id="page_status" class="w-full border rounded-xl p-3"><option value="published" ${page.Status === 'published' ? 'selected' : ''}>Published</option><option value="draft" ${page.Status === 'draft' ? 'selected' : ''}>Draft</option></select></div>
+                            <div><label class="font-bold">Content (HTML allowed)</label><textarea id="page_content" rows="10" class="w-full border rounded-xl p-3 font-mono">${escapeHtml(page.Content || '')}</textarea></div>
+                        </div>
+                        <div class="flex gap-4 mt-8"><button onclick="submitPageForm()" class="dynamic-bg text-white px-10 py-3 rounded-xl font-bold">PUBLISH</button><button onclick="closePageModal()" class="bg-slate-100 px-8 py-3 rounded-xl">Cancel</button></div>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        };
+        window.submitPageForm = async () => {
+            const data = {
+                id: document.getElementById('page_id').value,
+                title: document.getElementById('page_title').value,
+                slug: document.getElementById('page_slug').value,
+                content: document.getElementById('page_content').value,
+                menuOrder: parseInt(document.getElementById('page_order').value) || 0,
+                status: document.getElementById('page_status').value
+            };
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'savePage', data }) });
+            location.reload();
+        };
+        window.closePageModal = () => document.getElementById('pageModal')?.remove();
         window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
-        window.manageCategoriesUI = () => { /* existing */ };
-        window.openProductModal = (id=null) => { /* existing with SEO fields */ };
-        window.submitProductForm = async () => { /* existing */ };
-        window.deleteProductItem = async (id) => { /* existing */ };
-        window.saveAllSettings = async () => { /* existing */ };
-        window.adminLogin = async () => { /* existing */ };
+
+        // ======================== PRODUCT MODAL (with full SEO) ========================
+        window.openProductModal = (id = null) => {
+            const prod = id ? store.products.find(p => p.ID == id) : { ID: '', Title: '', Thumbnail: '', Images: '', Summary: '', Description: '', Technical_Info: '', Terms: '', Privacy: '', ServiceCommitment: '', SEOTitle: '', SEODesc: '', SEOKeywords: '', OGTitle: '', OGDesc: '', OGImage: '', TwitterCard: '', Category: store.categories[0]?.ID || 'general' };
+            const categoriesOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category == c.ID ? 'selected' : ''}>${escapeHtml(c.Name)}</option>`).join('');
+            const modalHtml = `
+                <div id="productModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 overflow-auto">
+                    <div class="bg-white w-full max-w-5xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
+                        <h2 class="text-3xl font-black mb-6">${id ? '✏️ EDIT PRODUCT' : '✨ CREATE PRODUCT'}</h2>
+                        <input type="hidden" id="prod_id" value="${prod.ID}">
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="space-y-4">
+                                <label class="font-bold">Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border rounded-xl p-3">
+                                <label>Category</label><select id="prod_cat" class="w-full border rounded-xl p-3">${categoriesOptions}</select>
+                                <label>Thumbnail URL</label><input id="prod_thumb" value="${escapeHtml(prod.Thumbnail || '')}" class="w-full border rounded-xl p-3">
+                                <label>Images (comma separated URLs for carousel)</label><textarea id="prod_images" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.Images || '')}</textarea>
+                                <label>Summary (short)</label><textarea id="prod_summary" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.Summary || '')}</textarea>
+                                <label>Full Description</label><textarea id="prod_desc" class="w-full border rounded-xl p-3" rows="4">${escapeHtml(prod.Description || '')}</textarea>
+                            </div>
+                            <div class="space-y-4">
+                                <label>Technical Info</label><textarea id="prod_tech" class="w-full border rounded-xl p-3" rows="3">${escapeHtml(prod.Technical_Info || '')}</textarea>
+                                <label>Terms of Service</label><textarea id="prod_terms" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.Terms || '')}</textarea>
+                                <label>Privacy Policy</label><textarea id="prod_privacy" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.Privacy || '')}</textarea>
+                                <label>Service Commitment</label><textarea id="prod_service" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.ServiceCommitment || '')}</textarea>
+                                <hr><h4 class="font-bold">SEO & Social</h4>
+                                <label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle || '')}" class="w-full border rounded-xl p-3">
+                                <label>SEO Description</label><textarea id="prod_seod" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.SEODesc || '')}</textarea>
+                                <label>SEO Keywords</label><input id="prod_seok" value="${escapeHtml(prod.SEOKeywords || '')}" class="w-full border rounded-xl p-3">
+                                <label>OG Title</label><input id="prod_ogtitle" value="${escapeHtml(prod.OGTitle || '')}" class="w-full border rounded-xl p-3">
+                                <label>OG Description</label><textarea id="prod_ogdesc" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.OGDesc || '')}</textarea>
+                                <label>OG Image URL</label><input id="prod_ogimage" value="${escapeHtml(prod.OGImage || '')}" class="w-full border rounded-xl p-3">
+                                <label>Twitter Card Type</label><input id="prod_twcard" value="${escapeHtml(prod.TwitterCard || 'summary_large_image')}" class="w-full border rounded-xl p-3">
+                            </div>
+                        </div>
+                        <div class="flex gap-4 mt-8"><button onclick="submitProductForm()" class="dynamic-bg text-white px-10 py-3 rounded-xl font-bold">PUBLISH</button><button onclick="closeProductModal()" class="bg-slate-100 px-8 py-3 rounded-xl">Cancel</button></div>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        };
+        window.submitProductForm = async () => {
+            const data = {
+                id: document.getElementById('prod_id').value,
+                catId: document.getElementById('prod_cat').value,
+                title: document.getElementById('prod_title').value,
+                thumb: document.getElementById('prod_thumb').value,
+                imgs: document.getElementById('prod_images').value,
+                summary: document.getElementById('prod_summary').value,
+                desc: document.getElementById('prod_desc').value,
+                tech: document.getElementById('prod_tech').value,
+                terms: document.getElementById('prod_terms').value,
+                privacy: document.getElementById('prod_privacy').value,
+                serviceCommitment: document.getElementById('prod_service').value,
+                seoT: document.getElementById('prod_seot').value,
+                seoD: document.getElementById('prod_seod').value,
+                seoK: document.getElementById('prod_seok').value,
+                ogTitle: document.getElementById('prod_ogtitle').value,
+                ogDesc: document.getElementById('prod_ogdesc').value,
+                ogImage: document.getElementById('prod_ogimage').value,
+                twCard: document.getElementById('prod_twcard').value
+            };
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveProduct', data }) });
+            location.reload();
+        };
+        window.closeProductModal = () => document.getElementById('productModal')?.remove();
+        window.deleteProductItem = async (id) => { if(confirm('Permanently delete?')) { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: { id } }) }); location.reload(); } };
+
+        // ======================== SETTINGS SAVE ========================
+        window.saveAllSettings = async () => {
+            const settings = {
+                site_title: document.getElementById('site_title')?.value,
+                company_name: document.getElementById('company_name')?.value,
+                company_moto: document.getElementById('company_moto')?.value,
+                how_it_works: document.getElementById('how_it_works')?.value,
+                logo_url: document.getElementById('logo_url')?.value,
+                primary_color: document.getElementById('primary_color')?.value,
+                font_size: document.getElementById('font_size')?.value,
+                menu_items: document.getElementById('menu_items')?.value,
+                favicon_url: document.getElementById('favicon_url')?.value,
+                site_meta_title: document.getElementById('site_meta_title')?.value,
+                site_meta_description: document.getElementById('site_meta_description')?.value
+            };
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateSettings', data: settings }) });
+            location.reload();
+        };
+
+        // ======================== AUTH ========================
+        window.adminLogin = async () => {
+            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', data: { username: document.getElementById('adminUser').value, password: document.getElementById('adminPass').value } }) });
+            const json = await res.json();
+            if(json.status === 'success') { localStorage.setItem('ws_token', json.token); router(); } else alert('Invalid credentials');
+        };
         window.adminLogout = () => { localStorage.removeItem('ws_token'); router(); };
+
         function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
     </script>
 </body>
