@@ -16,7 +16,7 @@
         .dynamic-text { color: var(--primary); }
         .dropdown:hover .dropdown-menu { display: block; }
         .swiper-button-next, .swiper-button-prev { color: var(--primary) !important; background: white; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .swiper-button-next:after, .swiper-button-prev:after { font-size: 18px !important; }
+        .tab-active { border-bottom: 2px solid var(--primary); color: var(--primary); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -35,12 +35,11 @@
     <footer id="siteFooter" class="border-t mt-12 py-8 text-slate-500 text-sm"></footer>
 
     <script>
-        // ======================== CONFIGURATION ========================
-        const API_URL = "https://script.google.com/macros/s/AKfycby6eiZzr0y_8b1TI-uEQWpsl6nYy6YbvlvslF5NRrDhp6s6UHPdDqUnm3gYn1qJ4OZv/exec"; // 🔁 REPLACE WITH YOUR DEPLOYED URL
+        const API_URL = "https://script.google.com/macros/s/AKfycbxBWLodLfRCe6nnTsdt6Z32y3l6QAk96UTs7GBr5G6N6eZvx21GZbYUybS3d1xRD__y/exec"; // REPLACE WITH YOUR URL
         let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [], footer: [] };
         let activeCategoryFilter = "all";
 
-        // ======================== INITIALIZATION ========================
+        // ======================== FETCH & THEME ========================
         async function fetchData() {
             try {
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
@@ -160,6 +159,24 @@
             meta.setAttribute('content', content);
         }
 
+        // ======================== IMAGE UPLOAD HELPER ========================
+        async function uploadImageToDrive(fileInputId, targetInputId) {
+            const fileInput = document.getElementById(fileInputId);
+            if (!fileInput || !fileInput.files.length) { alert("Select a file first"); return; }
+            const formData = new FormData();
+            formData.append('action', 'uploadImage');
+            formData.append('file', fileInput.files[0]);
+            formData.append('filename', fileInput.files[0].name);
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: formData });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    document.getElementById(targetInputId).value = json.url;
+                    alert("Image uploaded! URL inserted.");
+                } else alert("Upload failed: " + json.message);
+            } catch(e) { alert("Upload error"); }
+        }
+
         // ======================== BLOCK RENDERING ========================
         function renderBlocks(blocks, container) {
             if (!blocks.length) return;
@@ -169,7 +186,7 @@
                     if (block.Type === 'hero_image') {
                         container.innerHTML += `
                             <div class="relative rounded-3xl overflow-hidden mb-12">
-                                <img src="${escapeHtml(settings.image)}" alt="${escapeHtml(settings.alt)}" class="w-full h-[500px] object-cover">
+                                ${settings.image ? `<img src="${escapeHtml(settings.image)}" alt="${escapeHtml(settings.alt)}" class="w-full h-[500px] object-cover">` : '<div class="w-full h-[500px] bg-slate-200 flex items-center justify-center text-slate-400">Hero Image Placeholder</div>'}
                                 <div class="absolute inset-0 bg-black/40 flex flex-col justify-center items-center text-white text-center p-6">
                                     <h1 class="text-5xl md:text-7xl font-black mb-4">${escapeHtml(settings.caption)}</h1>
                                     <p class="text-xl max-w-2xl">${escapeHtml(settings.description)}</p>
@@ -319,8 +336,17 @@
                 const theme = Object.fromEntries((store.theme || []).map(i=>[i.Key,i.Value]));
                 const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
                 div.innerHTML = `
-                    <div class="bg-white p-6 rounded-2xl shadow space-y-4"><h3 class="font-black">Theme</h3><div class="grid md:grid-cols-2 gap-3"><label>Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color||'#0f172a'}"><label>Body BG</label><input type="color" id="body_bg" value="${theme.body_bg||'#f8fafc'}"><label>Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius||16}"><label>Base Font (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size||16}"><label>Font Family</label><input id="font_family" value="${theme.font_family||'Inter'}"></div><button onclick="saveTheme()" class="btn-primary px-4 py-2 rounded">Save Theme</button></div>
-                    <div class="bg-white p-6 rounded-2xl shadow mt-6"><h3 class="font-black">Company Info</h3><div class="grid md:grid-cols-2 gap-3">${Object.entries(company).map(([k,v])=>`<div><label>${k}</label><input id="comp_${k}" value="${escapeHtml(v)}" class="w-full border p-2 rounded"></div>`).join('')}</div><button onclick="saveCompanyInfo()" class="btn-primary px-4 py-2 rounded mt-4">Save Company</button></div>
+                    <div class="bg-white p-6 rounded-2xl shadow space-y-4"><h3 class="font-black">Theme</h3><div class="grid md:grid-cols-2 gap-3">
+                        <label>Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color||'#0f172a'}">
+                        <label>Body Background</label><input type="color" id="body_bg" value="${theme.body_bg||'#f8fafc'}">
+                        <label>Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius||16}">
+                        <label>Base Font Size (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size||16}">
+                        <label>Font Family</label><input id="font_family" value="${theme.font_family||'Inter'}" class="border p-2 rounded">
+                        <label>Logo</label><div class="flex gap-2"><input type="file" id="logoUpload" accept="image/*" class="text-sm"><button onclick="uploadImageToDrive('logoUpload','comp_logo_url')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload Logo</button></div>
+                    </div><button onclick="saveTheme()" class="btn-primary px-4 py-2 rounded mt-4">Save Theme</button></div>
+                    <div class="bg-white p-6 rounded-2xl shadow mt-6"><h3 class="font-black">Company Info</h3><div class="grid md:grid-cols-2 gap-3">
+                        ${Object.entries(company).map(([k,v])=>`<div><label>${k}</label><input id="comp_${k}" value="${escapeHtml(v)}" class="w-full border p-2 rounded"></div>`).join('')}
+                    </div><button onclick="saveCompanyInfo()" class="btn-primary px-4 py-2 rounded mt-4">Save Company</button></div>
                 `;
             } else if (tab === 'blocks') {
                 div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="blocksList"></div><button onclick="openBlockModal()" class="btn-primary px-4 py-2 rounded mt-4">+ Add Block</button></div>`;
@@ -333,7 +359,7 @@
                 renderProductsTable();
             } else if (tab === 'seo') {
                 const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><input id="seo_ogimage" placeholder="Default OG Image URL" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded">Save SEO</button></div>`;
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><div class="flex gap-2"><input type="file" id="ogImageUpload" accept="image/*"><button onclick="uploadImageToDrive('ogImageUpload','seo_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload OG Image</button></div><input id="seo_ogimage" placeholder="OG Image URL" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded">Save SEO</button></div>`;
             } else if (tab === 'footer') {
                 const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
                 div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Footer Settings</h3><label>Copyright Text</label><input id="footer_copyright" value="${escapeHtml(footer.copyright_text||'')}" class="w-full border p-2 rounded"><label>Links (JSON array: [{"text":"Home","url":"/"}])</label><textarea id="footer_links" rows="3" class="w-full border p-2 rounded">${escapeHtml(footer.footer_links||'[]')}</textarea><label>Custom HTML (overrides links & copyright)</label><textarea id="footer_html" rows="4" class="w-full border p-2 rounded">${escapeHtml(footer.footer_html||'')}</textarea><button onclick="saveFooter()" class="btn-primary px-4 py-2 rounded">Save Footer</button></div>`;
@@ -393,63 +419,85 @@
             location.reload();
         };
 
-        // Content Blocks with predefined types
+        // Content Blocks with image upload for hero and carousel
         window.openBlockModal = (id=null) => {
             const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'hero_image', Settings:'{}', Order:0, Location:'homepage' };
-            let settingsHtml = '';
-            if (block.Type === 'hero_image') {
-                let s = {};
-                try { s = JSON.parse(block.Settings || '{}'); } catch(e) {}
-                settingsHtml = `
-                    <label>Image URL</label><input id="hero_image" value="${escapeHtml(s.image||'')}" class="w-full border p-2 rounded mb-2"><button onclick="uploadImageToDrive('heroImageUpload','hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs mb-3">Upload Image</button><input type="file" id="heroImageUpload" accept="image/*" class="hidden">
-                    <label>Caption</label><input id="hero_caption" value="${escapeHtml(s.caption||'')}" class="w-full border p-2 rounded mb-2">
-                    <label>Description</label><textarea id="hero_desc" class="w-full border p-2 rounded mb-2">${escapeHtml(s.description||'')}</textarea>
-                    <label>Alt Text</label><input id="hero_alt" value="${escapeHtml(s.alt||'')}" class="w-full border p-2 rounded mb-2">
-                    <label>Button Text (optional)</label><input id="hero_btn_text" value="${escapeHtml(s.buttonText||'')}" class="w-full border p-2 rounded mb-2">
-                    <label>Button Link</label><input id="hero_btn_link" value="${escapeHtml(s.buttonLink||'#/products')}" class="w-full border p-2 rounded mb-2">
-                `;
-            } else if (block.Type === 'carousel') {
-                let s = {};
-                try { s = JSON.parse(block.Settings || '{}'); } catch(e) {}
-                const slides = s.slides || [];
-                settingsHtml = `
-                    <label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${s.autoplay?'selected':''}>Yes</option><option value="false" ${!s.autoplay?'selected':''}>No</option></select>
-                    <label>Interval (ms)</label><input id="carousel_interval" type="number" value="${s.interval||5000}" class="w-full border p-2 rounded mb-4">
-                    <div id="carouselSlidesList"></div>
-                    <button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>
-                `;
-                setTimeout(() => renderCarouselSlides(slides), 10);
-            } else {
-                settingsHtml = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded">${escapeHtml(block.Settings)}</textarea>`;
-            }
-            const modalHtml = `<div id="blockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto"><div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3" onchange="toggleBlockSettings()"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer">${settingsHtml}</div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
+            let settings = {};
+            try { settings = JSON.parse(block.Settings || '{}'); } catch(e) {}
+            const modalHtml = `<div id="blockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto"><div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3" onchange="toggleBlockSettings()"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer"></div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             window.toggleBlockSettings = () => {
                 const type = document.getElementById('block_type').value;
                 const container = document.getElementById('settingsContainer');
-                if (type === 'hero_image') container.innerHTML = `<label>Image URL</label><input id="hero_image" class="w-full border p-2 rounded mb-2"><button onclick="uploadImageToDrive('heroImageUpload','hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs mb-3">Upload Image</button><input type="file" id="heroImageUpload" accept="image/*" class="hidden"><label>Caption</label><input id="hero_caption" class="w-full border p-2 rounded mb-2"><label>Description</label><textarea id="hero_desc" class="w-full border p-2 rounded mb-2"></textarea><label>Alt Text</label><input id="hero_alt" class="w-full border p-2 rounded mb-2"><label>Button Text</label><input id="hero_btn_text" class="w-full border p-2 rounded mb-2"><label>Button Link</label><input id="hero_btn_link" class="w-full border p-2 rounded mb-2">`;
-                else if (type === 'carousel') container.innerHTML = `<label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true">Yes</option><option value="false">No</option></select><label>Interval (ms)</label><input id="carousel_interval" type="number" value="5000" class="w-full border p-2 rounded mb-4"><div id="carouselSlidesList"></div><button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>`;
-                else container.innerHTML = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded" placeholder="<div>Your HTML content</div>"></textarea>`;
+                if (type === 'hero_image') {
+                    container.innerHTML = `
+                        <div class="flex gap-2 mb-3"><input type="file" id="heroImageUpload" accept="image/*"><button onclick="uploadImageToDrive('heroImageUpload','hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload Image</button></div>
+                        <input id="hero_image" placeholder="Image URL" value="${escapeHtml(settings.image||'')}" class="w-full border p-2 rounded mb-2">
+                        <input id="hero_caption" placeholder="Caption" value="${escapeHtml(settings.caption||'')}" class="w-full border p-2 rounded mb-2">
+                        <textarea id="hero_desc" placeholder="Description" class="w-full border p-2 rounded mb-2">${escapeHtml(settings.description||'')}</textarea>
+                        <input id="hero_alt" placeholder="Alt Text" value="${escapeHtml(settings.alt||'')}" class="w-full border p-2 rounded mb-2">
+                        <input id="hero_btn_text" placeholder="Button Text (optional)" value="${escapeHtml(settings.buttonText||'')}" class="w-full border p-2 rounded mb-2">
+                        <input id="hero_btn_link" placeholder="Button Link" value="${escapeHtml(settings.buttonLink||'#/products')}" class="w-full border p-2 rounded mb-2">
+                    `;
+                } else if (type === 'carousel') {
+                    const slides = settings.slides || [];
+                    container.innerHTML = `
+                        <label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${settings.autoplay?'selected':''}>Yes</option><option value="false" ${!settings.autoplay?'selected':''}>No</option></select>
+                        <label>Interval (ms)</label><input id="carousel_interval" type="number" value="${settings.interval||5000}" class="w-full border p-2 rounded mb-4">
+                        <div id="carouselSlidesList"></div>
+                        <button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>
+                    `;
+                    window.renderCarouselSlides = (slides) => {
+                        const list = document.getElementById('carouselSlidesList');
+                        if (!list) return;
+                        list.innerHTML = '';
+                        slides.forEach((slide, idx) => {
+                            const div = document.createElement('div');
+                            div.className = 'border p-3 rounded mb-2';
+                            div.innerHTML = `<h4>Slide ${idx+1}</h4>
+                                <div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadCarouselSlideImage(this,'${idx}')" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div>
+                                <input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1">
+                                <input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1">
+                                <textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea>
+                                <input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded">
+                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                            list.appendChild(div);
+                        });
+                    };
+                    window.uploadCarouselSlideImage = (btn, idx) => {
+                        const fileInput = btn.previousElementSibling;
+                        if (!fileInput.files.length) return;
+                        const formData = new FormData();
+                        formData.append('action', 'uploadImage');
+                        formData.append('file', fileInput.files[0]);
+                        fetch(API_URL, { method:'POST', body:formData }).then(r=>r.json()).then(json=>{
+                            if(json.status==='success') {
+                                const slideDiv = btn.closest('.border');
+                                slideDiv.querySelector('.slide-image').value = json.url;
+                                alert('Uploaded');
+                            } else alert('Failed');
+                        });
+                    };
+                    window.addCarouselSlide = () => {
+                        const list = document.getElementById('carouselSlidesList');
+                        const idx = list.children.length;
+                        const div = document.createElement('div');
+                        div.className = 'border p-3 rounded mb-2';
+                        div.innerHTML = `<h4>Slide ${idx+1}</h4>
+                            <div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadCarouselSlideImage(this,${idx})" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div>
+                            <input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1">
+                            <input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1">
+                            <textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea>
+                            <input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded">
+                            <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                        list.appendChild(div);
+                    };
+                    window.renderCarouselSlides(slides);
+                } else {
+                    container.innerHTML = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded" placeholder="<div>Your HTML content</div>">${escapeHtml(block.Settings)}</textarea>`;
+                }
             };
-            window.addCarouselSlide = () => {
-                const list = document.getElementById('carouselSlidesList');
-                const idx = list.children.length;
-                const div = document.createElement('div');
-                div.className = 'border p-3 rounded mb-2';
-                div.innerHTML = `<h4>Slide ${idx+1}</h4><input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea><input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
-                list.appendChild(div);
-            };
-            window.renderCarouselSlides = (slides) => {
-                const list = document.getElementById('carouselSlidesList');
-                if (!list) return;
-                list.innerHTML = '';
-                slides.forEach((slide, idx) => {
-                    const div = document.createElement('div');
-                    div.className = 'border p-3 rounded mb-2';
-                    div.innerHTML = `<h4>Slide ${idx+1}</h4><input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea><input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
-                    list.appendChild(div);
-                });
-            };
+            window.toggleBlockSettings();
         };
         window.submitBlock = async () => {
             const type = document.getElementById('block_type').value;
@@ -510,12 +558,28 @@
         window.editPage = (id) => openPageModal(id);
         window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
 
-        // Products CRUD with image upload
+        // Products with image upload for thumbnail and images
         window.openProductModal = (id=null) => {
             const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
             const catOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category===c.ID?'selected':''}>${escapeHtml(c.Name)}</option>`).join('');
-            const modalHtml = `<div id="productModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto"><div class="bg-white w-full max-w-5xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Product' : 'New Product'}</h3><input type="hidden" id="prod_id" value="${prod.ID}"><div class="grid md:grid-cols-2 gap-4"><div><label>Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border p-2 rounded mb-2"><label>Category</label><select id="prod_cat" class="w-full border p-2 rounded mb-2">${catOptions}</select><label>Thumbnail URL</label><input id="prod_thumb" value="${escapeHtml(prod.Thumbnail)}" class="w-full border p-2 rounded mb-2"><div class="flex gap-2 mb-2"><input type="file" id="thumbUpload" accept="image/*" class="text-sm"><button onclick="uploadImageToDrive('thumbUpload','prod_thumb')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><label>Images (comma URLs)</label><textarea id="prod_images" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Images)}</textarea><label>Summary</label><textarea id="prod_summary" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Summary)}</textarea><label>Description</label><textarea id="prod_desc" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Description)}</textarea></div><div><label>Technical Info</label><textarea id="prod_tech" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Technical_Info)}</textarea><label>Terms</label><textarea id="prod_terms" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Terms)}</textarea><label>Privacy</label><textarea id="prod_privacy" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Privacy)}</textarea><label>Service Commitment</label><textarea id="prod_service" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.ServiceCommitment)}</textarea><hr class="my-2"><label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle)}" class="w-full border p-2 rounded mb-2"><label>SEO Description</label><textarea id="prod_seod" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.SEODesc)}</textarea><label>SEO Keywords</label><input id="prod_seok" value="${escapeHtml(prod.SEOKeywords)}" class="w-full border p-2 rounded mb-2"><label>OG Title</label><input id="prod_ogtitle" value="${escapeHtml(prod.OGTitle)}" class="w-full border p-2 rounded mb-2"><label>OG Description</label><textarea id="prod_ogdesc" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.OGDesc)}</textarea><label>OG Image</label><input id="prod_ogimage" value="${escapeHtml(prod.OGImage)}" class="w-full border p-2 rounded mb-2"><label>Twitter Card</label><input id="prod_twcard" value="${escapeHtml(prod.TwitterCard)}" class="w-full border p-2 rounded mb-2"></div></div><div class="flex gap-3 mt-6"><button onclick="submitProduct()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('productModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
+            const modalHtml = `<div id="productModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto"><div class="bg-white w-full max-w-5xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Product' : 'New Product'}</h3><input type="hidden" id="prod_id" value="${prod.ID}"><div class="grid md:grid-cols-2 gap-4"><div><label>Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border p-2 rounded mb-2"><label>Category</label><select id="prod_cat" class="w-full border p-2 rounded mb-2">${catOptions}</select><label>Thumbnail</label><div class="flex gap-2 mb-2"><input type="file" id="thumbUpload" accept="image/*"><button onclick="uploadImageToDrive('thumbUpload','prod_thumb')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="prod_thumb" value="${escapeHtml(prod.Thumbnail)}" class="w-full border p-2 rounded mb-2"><label>Images (comma URLs)</label><textarea id="prod_images" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Images)}</textarea><div class="flex gap-2 mb-2"><input type="file" id="multiImagesUpload" accept="image/*" multiple><button onclick="uploadMultipleImages()" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload & Add</button></div><label>Summary</label><textarea id="prod_summary" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Summary)}</textarea><label>Description</label><textarea id="prod_desc" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Description)}</textarea></div><div><label>Technical Info</label><textarea id="prod_tech" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Technical_Info)}</textarea><label>Terms</label><textarea id="prod_terms" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Terms)}</textarea><label>Privacy</label><textarea id="prod_privacy" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Privacy)}</textarea><label>Service Commitment</label><textarea id="prod_service" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.ServiceCommitment)}</textarea><hr class="my-2"><label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle)}" class="w-full border p-2 rounded mb-2"><label>SEO Description</label><textarea id="prod_seod" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.SEODesc)}</textarea><label>SEO Keywords</label><input id="prod_seok" value="${escapeHtml(prod.SEOKeywords)}" class="w-full border p-2 rounded mb-2"><label>OG Title</label><input id="prod_ogtitle" value="${escapeHtml(prod.OGTitle)}" class="w-full border p-2 rounded mb-2"><label>OG Description</label><textarea id="prod_ogdesc" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.OGDesc)}</textarea><label>OG Image</label><div class="flex gap-2 mb-2"><input type="file" id="ogImageUploadProd" accept="image/*"><button onclick="uploadImageToDrive('ogImageUploadProd','prod_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="prod_ogimage" value="${escapeHtml(prod.OGImage)}" class="w-full border p-2 rounded mb-2"><label>Twitter Card</label><input id="prod_twcard" value="${escapeHtml(prod.TwitterCard)}" class="w-full border p-2 rounded mb-2"></div></div><div class="flex gap-3 mt-6"><button onclick="submitProduct()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('productModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
+            window.uploadMultipleImages = async () => {
+                const files = document.getElementById('multiImagesUpload').files;
+                const current = document.getElementById('prod_images').value;
+                const urls = current ? current.split(',').map(u=>u.trim()) : [];
+                for (let file of files) {
+                    const formData = new FormData();
+                    formData.append('action', 'uploadImage');
+                    formData.append('file', file);
+                    formData.append('filename', file.name);
+                    const res = await fetch(API_URL, { method:'POST', body:formData });
+                    const json = await res.json();
+                    if (json.status === 'success') urls.push(json.url);
+                }
+                document.getElementById('prod_images').value = urls.join(',');
+                alert('Uploaded ' + files.length + ' images');
+            };
         };
         window.submitProduct = async () => {
             const data = { id: document.getElementById('prod_id').value, catId: document.getElementById('prod_cat').value, title: document.getElementById('prod_title').value, thumb: document.getElementById('prod_thumb').value, imgs: document.getElementById('prod_images').value, summary: document.getElementById('prod_summary').value, desc: document.getElementById('prod_desc').value, tech: document.getElementById('prod_tech').value, terms: document.getElementById('prod_terms').value, privacy: document.getElementById('prod_privacy').value, serviceCommitment: document.getElementById('prod_service').value, seoT: document.getElementById('prod_seot').value, seoD: document.getElementById('prod_seod').value, seoK: document.getElementById('prod_seok').value, ogTitle: document.getElementById('prod_ogtitle').value, ogDesc: document.getElementById('prod_ogdesc').value, ogImage: document.getElementById('prod_ogimage').value, twCard: document.getElementById('prod_twcard').value };
@@ -524,23 +588,6 @@
         };
         window.deleteProductItem = async (id) => { if(confirm('Delete product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
         window.editProduct = (id) => openProductModal(id);
-
-        window.uploadImageToDrive = async (fileInputId, targetInputId) => {
-            const fileInput = document.getElementById(fileInputId);
-            if (!fileInput || !fileInput.files.length) { alert("Select a file first"); return; }
-            const formData = new FormData();
-            formData.append('action', 'uploadImage');
-            formData.append('file', fileInput.files[0]);
-            formData.append('filename', fileInput.files[0].name);
-            try {
-                const res = await fetch(API_URL, { method: 'POST', body: formData });
-                const json = await res.json();
-                if (json.status === 'success') {
-                    document.getElementById(targetInputId).value = json.url;
-                    alert("Image uploaded! URL inserted.");
-                } else alert("Upload failed: " + json.message);
-            } catch(e) { alert("Upload error"); }
-        };
 
         window.closeModal = (id) => { const el = document.getElementById(id); if (el) el.remove(); };
         function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
