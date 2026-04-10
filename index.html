@@ -14,12 +14,12 @@
         .btn-primary { background: var(--primary); color: white; border-radius: var(--radius); transition: opacity 0.2s; }
         .btn-primary:hover { opacity: 0.9; }
         .dynamic-text { color: var(--primary); }
-        .tab-active { border-bottom: 2px solid var(--primary); color: var(--primary); font-weight: bold; }
         .dropdown:hover .dropdown-menu { display: block; }
+        .swiper-button-next, .swiper-button-prev { color: var(--primary) !important; background: white; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .swiper-button-next:after, .swiper-button-prev:after { font-size: 18px !important; }
     </style>
 </head>
 <body>
-    <!-- Dynamic Navbar (no admin button for public) -->
     <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur border-b shadow-sm">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3 cursor-pointer" onclick="location.hash='#/'">
@@ -32,13 +32,15 @@
 
     <main id="app" class="container mx-auto px-4 py-6 min-h-screen"></main>
 
-    <footer id="siteFooter" class="text-center py-8 border-t mt-12 text-slate-500 text-sm"></footer>
+    <footer id="siteFooter" class="border-t mt-12 py-8 text-slate-500 text-sm"></footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbzpPyRxUGaOgeaodFNDWnM9xB4VKDjR8wZLfGJPQ9SJppfXVstKM_D7tg5lcf-TtMNr/exec"; // 🔁 REPLACE WITH YOUR DEPLOYED URL
-        let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [] };
+        // ======================== CONFIGURATION ========================
+        const API_URL = "https://script.google.com/macros/s/AKfycby6eiZzr0y_8b1TI-uEQWpsl6nYy6YbvlvslF5NRrDhp6s6UHPdDqUnm3gYn1qJ4OZv/exec"; // 🔁 REPLACE WITH YOUR DEPLOYED URL
+        let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [], footer: [] };
         let activeCategoryFilter = "all";
 
+        // ======================== INITIALIZATION ========================
         async function fetchData() {
             try {
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
@@ -47,6 +49,7 @@
                 applyTheme();
                 buildHierarchicalMenu();
                 renderFooter();
+                injectSeoMetaTags();
                 router();
             } catch(e) { console.error(e); }
         }
@@ -93,29 +96,132 @@
         }
 
         function renderFooter() {
-            const footerBlock = (store.contentBlocks || []).find(b => b.BlockName === 'footer' && b.Location === 'global');
+            const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
             const footerEl = document.getElementById('siteFooter');
-            if (footerBlock) footerEl.innerHTML = footerBlock.Content;
-            else footerEl.innerHTML = '© WorkSmart CMS';
-        }
-
-        function getBlocksByLocation(location) {
-            return (store.contentBlocks || []).filter(b => b.Location === location).sort((a,b)=>a.Order-b.Order);
-        }
-
-        function renderHome(container) {
-            const blocks = getBlocksByLocation('homepage');
-            if (blocks.length === 0) {
-                container.innerHTML = `<div class="text-center py-20">No content blocks found. Go to Admin → Content Blocks and add blocks with Location = "homepage".</div>`;
+            if (footer.footer_html) {
+                footerEl.innerHTML = footer.footer_html;
                 return;
             }
-            let html = '';
-            blocks.forEach(block => {
-                if (block.Type === 'html') html += block.Content;
-                else if (block.Type === 'text') html += `<div class="prose max-w-none my-6">${block.Content}</div>`;
-                else if (block.Type === 'image') html += `<img src="${block.Content}" class="w-full rounded-2xl my-6">`;
-            });
-            container.innerHTML = html;
+            let linksHtml = '';
+            if (footer.footer_links) {
+                try {
+                    const links = JSON.parse(footer.footer_links);
+                    linksHtml = links.map(l => `<a href="${l.url}" class="hover:dynamic-text mx-2">${escapeHtml(l.text)}</a>`).join('');
+                } catch(e) {}
+            }
+            footerEl.innerHTML = `<div class="container mx-auto px-4 text-center">${linksHtml}${linksHtml ? '<br>' : ''}<span>${escapeHtml(footer.copyright_text || '© WorkSmart CMS')}</span></div>`;
+        }
+
+        function injectSeoMetaTags() {
+            const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
+            const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
+            const hash = window.location.hash;
+            let title = seo.default_title || company.site_title || "WorkSmart";
+            let description = seo.default_description || company.company_moto || "";
+            let keywords = seo.default_keywords || "";
+            let ogImage = seo.default_og_image || "";
+            
+            if (hash.startsWith('#/product/')) {
+                const prod = store.products.find(p => p.ID === hash.split('/')[2]);
+                if (prod) {
+                    title = prod.SEOTitle || prod.Title;
+                    description = prod.SEODesc || prod.Summary;
+                    keywords = prod.SEOKeywords || "";
+                    ogImage = prod.OGImage || prod.Thumbnail;
+                }
+            } else if (hash.startsWith('#/page/')) {
+                const page = store.pages.find(p => p.Slug === hash.split('/')[2]);
+                if (page) {
+                    title = page.Title;
+                    description = page.Content.replace(/<[^>]*>/g, '').substring(0, 160);
+                }
+            }
+            
+            document.title = title;
+            setMetaTag('description', description);
+            setMetaTag('keywords', keywords);
+            setMetaTag('og:title', title);
+            setMetaTag('og:description', description);
+            setMetaTag('og:image', ogImage);
+            setMetaTag('twitter:card', 'summary_large_image');
+            if (seo.twitter_handle) setMetaTag('twitter:site', seo.twitter_handle);
+        }
+        
+        function setMetaTag(name, content) {
+            if (!content) return;
+            let selector = name.startsWith('og:') ? `meta[property="${name}"]` : `meta[name="${name}"]`;
+            let meta = document.querySelector(selector);
+            if (!meta) {
+                meta = document.createElement('meta');
+                if (name.startsWith('og:')) meta.setAttribute('property', name);
+                else meta.setAttribute('name', name);
+                document.head.appendChild(meta);
+            }
+            meta.setAttribute('content', content);
+        }
+
+        // ======================== BLOCK RENDERING ========================
+        function renderBlocks(blocks, container) {
+            if (!blocks.length) return;
+            for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
+                try {
+                    const settings = JSON.parse(block.Settings || '{}');
+                    if (block.Type === 'hero_image') {
+                        container.innerHTML += `
+                            <div class="relative rounded-3xl overflow-hidden mb-12">
+                                <img src="${escapeHtml(settings.image)}" alt="${escapeHtml(settings.alt)}" class="w-full h-[500px] object-cover">
+                                <div class="absolute inset-0 bg-black/40 flex flex-col justify-center items-center text-white text-center p-6">
+                                    <h1 class="text-5xl md:text-7xl font-black mb-4">${escapeHtml(settings.caption)}</h1>
+                                    <p class="text-xl max-w-2xl">${escapeHtml(settings.description)}</p>
+                                    ${settings.buttonText ? `<a href="${settings.buttonLink}" class="mt-6 inline-block bg-white text-slate-900 px-8 py-3 rounded-full font-bold">${escapeHtml(settings.buttonText)}</a>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    } else if (block.Type === 'carousel') {
+                        const slides = settings.slides || [];
+                        const swiperId = `swiper-${Date.now()}`;
+                        container.innerHTML += `
+                            <div class="swiper ${swiperId} rounded-3xl mb-12 overflow-hidden">
+                                <div class="swiper-wrapper">
+                                    ${slides.map(slide => `
+                                        <div class="swiper-slide relative">
+                                            <img src="${escapeHtml(slide.image)}" alt="${escapeHtml(slide.alt)}" class="w-full h-[500px] object-cover">
+                                            <div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6">
+                                                <h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2>
+                                                <p class="text-lg mt-2">${escapeHtml(slide.description)}</p>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="swiper-button-next"></div>
+                                <div class="swiper-button-prev"></div>
+                                <div class="swiper-pagination"></div>
+                            </div>
+                        `;
+                        setTimeout(() => {
+                            new Swiper(`.${swiperId}`, {
+                                navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+                                pagination: { el: '.swiper-pagination', clickable: true },
+                                autoplay: settings.autoplay ? { delay: settings.interval || 5000 } : false,
+                                loop: slides.length > 1
+                            });
+                        }, 100);
+                    } else if (block.Type === 'custom_html') {
+                        container.innerHTML += `<div class="mb-12">${settings}</div>`;
+                    }
+                } catch(e) { console.error('Block render error', block, e); }
+            }
+        }
+
+        // ======================== PUBLIC VIEWS ========================
+        function renderHome(container) {
+            const homepageBlocks = (store.contentBlocks || []).filter(b => b.Location === 'homepage').sort((a,b)=>a.Order-b.Order);
+            if (homepageBlocks.length === 0) {
+                container.innerHTML = `<div class="text-center py-20">No content blocks. Go to Admin → Content Blocks to add Hero Image, Carousel, or Custom HTML.</div>`;
+                return;
+            }
+            container.innerHTML = '';
+            renderBlocks(homepageBlocks, container);
         }
 
         function renderProductList(container) {
@@ -198,10 +304,11 @@
                     <button data-tab="pages" class="tab-btn px-4 py-2">Pages (Menu)</button>
                     <button data-tab="products" class="tab-btn px-4 py-2">Products</button>
                     <button data-tab="seo" class="tab-btn px-4 py-2">SEO</button>
+                    <button data-tab="footer" class="tab-btn px-4 py-2">Footer</button>
                 </div>
                 <div id="tabContent"></div>
             `;
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.onclick = () => loadTab(btn.innerText.toLowerCase().includes('site')?'site':btn.innerText.toLowerCase().includes('blocks')?'blocks':btn.innerText.toLowerCase().includes('pages')?'pages':btn.innerText.toLowerCase().includes('products')?'products':'seo'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.onclick = () => loadTab(btn.innerText.toLowerCase().includes('site')?'site':btn.innerText.toLowerCase().includes('blocks')?'blocks':btn.innerText.toLowerCase().includes('pages')?'pages':btn.innerText.toLowerCase().includes('products')?'products':btn.innerText.toLowerCase().includes('seo')?'seo':'footer'));
             loadTab('site');
         }
 
@@ -226,7 +333,10 @@
                 renderProductsTable();
             } else if (tab === 'seo') {
                 const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_ogimage" placeholder="Default OG Image" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded">Save SEO</button></div>`;
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><input id="seo_ogimage" placeholder="Default OG Image URL" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded">Save SEO</button></div>`;
+            } else if (tab === 'footer') {
+                const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Footer Settings</h3><label>Copyright Text</label><input id="footer_copyright" value="${escapeHtml(footer.copyright_text||'')}" class="w-full border p-2 rounded"><label>Links (JSON array: [{"text":"Home","url":"/"}])</label><textarea id="footer_links" rows="3" class="w-full border p-2 rounded">${escapeHtml(footer.footer_links||'[]')}</textarea><label>Custom HTML (overrides links & copyright)</label><textarea id="footer_html" rows="4" class="w-full border p-2 rounded">${escapeHtml(footer.footer_html||'')}</textarea><button onclick="saveFooter()" class="btn-primary px-4 py-2 rounded">Save Footer</button></div>`;
             }
         }
 
@@ -235,7 +345,7 @@
             const container = document.getElementById('blocksList');
             if (!container) return;
             container.innerHTML = blocks.map(b => `
-                <div class="border-b py-3 flex justify-between"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type} | ${b.Location})<br><div class="text-xs text-slate-500">${escapeHtml(b.Content?.substring(0,80))}...</div></div><div><button onclick="editBlock('${b.BlockID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteBlock('${b.BlockID}')" class="text-red-500">Delete</button></div></div>
+                <div class="border-b py-3 flex justify-between items-center"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type})<br><div class="text-xs text-slate-500">Order: ${b.Order} | Location: ${b.Location}</div></div><div><button onclick="editBlock('${b.BlockID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteBlock('${b.BlockID}')" class="text-red-500">Delete</button></div></div>
             `).join('');
         }
 
@@ -244,7 +354,7 @@
             const container = document.getElementById('pagesList');
             if (!container) return;
             container.innerHTML = pages.map(p => `
-                <div class="border-b py-3 flex justify-between"><div><b>${escapeHtml(p.Title)}</b> /${p.Slug} ${p.ParentID ? '(child)' : ''}</div><div><button onclick="editPage('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deletePage('${p.ID}')" class="text-red-500">Delete</button></div></div>
+                <div class="border-b py-3 flex justify-between"><div><b>${escapeHtml(p.Title)}</b> /${p.Slug} ${p.ParentID ? '(child)' : ''}</div><div><button onclick="editPage('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deletePageItem('${p.ID}')" class="text-red-500">Delete</button></div></div>
             `).join('');
         }
 
@@ -273,26 +383,119 @@
             location.reload();
         };
         window.saveSeo = async () => {
-            const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_og_image: document.getElementById('seo_ogimage')?.value };
+            const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_keywords: document.getElementById('seo_keywords')?.value, default_og_image: document.getElementById('seo_ogimage')?.value, twitter_handle: document.getElementById('seo_twitter')?.value };
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSeoDefaults', data }) });
             location.reload();
         };
+        window.saveFooter = async () => {
+            const data = { copyright_text: document.getElementById('footer_copyright')?.value, footer_links: document.getElementById('footer_links')?.value, footer_html: document.getElementById('footer_html')?.value };
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateFooter', data }) });
+            location.reload();
+        };
 
-        // Content Blocks
+        // Content Blocks with predefined types
         window.openBlockModal = (id=null) => {
-            const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'html', Content:'', Order:0, Location:'homepage' };
-            const html = `<div id="blockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name (e.g., hero)" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3"><option value="html" ${block.Type==='html'?'selected':''}>HTML</option><option value="text" ${block.Type==='text'?'selected':''}>Text</option><option value="image" ${block.Type==='image'?'selected':''}>Image URL</option></select><textarea id="block_content" rows="8" class="w-full border p-3 rounded mb-3" placeholder="HTML or text or image URL">${escapeHtml(block.Content)}</textarea><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option><option value="global" ${block.Location==='global'?'selected':''}>Global (footer)</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
-            document.body.insertAdjacentHTML('beforeend', html);
+            const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'hero_image', Settings:'{}', Order:0, Location:'homepage' };
+            let settingsHtml = '';
+            if (block.Type === 'hero_image') {
+                let s = {};
+                try { s = JSON.parse(block.Settings || '{}'); } catch(e) {}
+                settingsHtml = `
+                    <label>Image URL</label><input id="hero_image" value="${escapeHtml(s.image||'')}" class="w-full border p-2 rounded mb-2"><button onclick="uploadImageToDrive('heroImageUpload','hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs mb-3">Upload Image</button><input type="file" id="heroImageUpload" accept="image/*" class="hidden">
+                    <label>Caption</label><input id="hero_caption" value="${escapeHtml(s.caption||'')}" class="w-full border p-2 rounded mb-2">
+                    <label>Description</label><textarea id="hero_desc" class="w-full border p-2 rounded mb-2">${escapeHtml(s.description||'')}</textarea>
+                    <label>Alt Text</label><input id="hero_alt" value="${escapeHtml(s.alt||'')}" class="w-full border p-2 rounded mb-2">
+                    <label>Button Text (optional)</label><input id="hero_btn_text" value="${escapeHtml(s.buttonText||'')}" class="w-full border p-2 rounded mb-2">
+                    <label>Button Link</label><input id="hero_btn_link" value="${escapeHtml(s.buttonLink||'#/products')}" class="w-full border p-2 rounded mb-2">
+                `;
+            } else if (block.Type === 'carousel') {
+                let s = {};
+                try { s = JSON.parse(block.Settings || '{}'); } catch(e) {}
+                const slides = s.slides || [];
+                settingsHtml = `
+                    <label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${s.autoplay?'selected':''}>Yes</option><option value="false" ${!s.autoplay?'selected':''}>No</option></select>
+                    <label>Interval (ms)</label><input id="carousel_interval" type="number" value="${s.interval||5000}" class="w-full border p-2 rounded mb-4">
+                    <div id="carouselSlidesList"></div>
+                    <button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>
+                `;
+                setTimeout(() => renderCarouselSlides(slides), 10);
+            } else {
+                settingsHtml = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded">${escapeHtml(block.Settings)}</textarea>`;
+            }
+            const modalHtml = `<div id="blockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto"><div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3" onchange="toggleBlockSettings()"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer">${settingsHtml}</div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            window.toggleBlockSettings = () => {
+                const type = document.getElementById('block_type').value;
+                const container = document.getElementById('settingsContainer');
+                if (type === 'hero_image') container.innerHTML = `<label>Image URL</label><input id="hero_image" class="w-full border p-2 rounded mb-2"><button onclick="uploadImageToDrive('heroImageUpload','hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs mb-3">Upload Image</button><input type="file" id="heroImageUpload" accept="image/*" class="hidden"><label>Caption</label><input id="hero_caption" class="w-full border p-2 rounded mb-2"><label>Description</label><textarea id="hero_desc" class="w-full border p-2 rounded mb-2"></textarea><label>Alt Text</label><input id="hero_alt" class="w-full border p-2 rounded mb-2"><label>Button Text</label><input id="hero_btn_text" class="w-full border p-2 rounded mb-2"><label>Button Link</label><input id="hero_btn_link" class="w-full border p-2 rounded mb-2">`;
+                else if (type === 'carousel') container.innerHTML = `<label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true">Yes</option><option value="false">No</option></select><label>Interval (ms)</label><input id="carousel_interval" type="number" value="5000" class="w-full border p-2 rounded mb-4"><div id="carouselSlidesList"></div><button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>`;
+                else container.innerHTML = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded" placeholder="<div>Your HTML content</div>"></textarea>`;
+            };
+            window.addCarouselSlide = () => {
+                const list = document.getElementById('carouselSlidesList');
+                const idx = list.children.length;
+                const div = document.createElement('div');
+                div.className = 'border p-3 rounded mb-2';
+                div.innerHTML = `<h4>Slide ${idx+1}</h4><input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea><input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                list.appendChild(div);
+            };
+            window.renderCarouselSlides = (slides) => {
+                const list = document.getElementById('carouselSlidesList');
+                if (!list) return;
+                list.innerHTML = '';
+                slides.forEach((slide, idx) => {
+                    const div = document.createElement('div');
+                    div.className = 'border p-3 rounded mb-2';
+                    div.innerHTML = `<h4>Slide ${idx+1}</h4><input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea><input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                    list.appendChild(div);
+                });
+            };
         };
         window.submitBlock = async () => {
-            const data = { id: document.getElementById('block_id').value, blockName: document.getElementById('block_name').value, type: document.getElementById('block_type').value, content: document.getElementById('block_content').value, order: document.getElementById('block_order').value, location: document.getElementById('block_location').value };
+            const type = document.getElementById('block_type').value;
+            let settings = {};
+            if (type === 'hero_image') {
+                settings = {
+                    image: document.getElementById('hero_image')?.value || '',
+                    caption: document.getElementById('hero_caption')?.value || '',
+                    description: document.getElementById('hero_desc')?.value || '',
+                    alt: document.getElementById('hero_alt')?.value || '',
+                    buttonText: document.getElementById('hero_btn_text')?.value || '',
+                    buttonLink: document.getElementById('hero_btn_link')?.value || '#/products'
+                };
+            } else if (type === 'carousel') {
+                const slides = [];
+                const slideDivs = document.querySelectorAll('#carouselSlidesList > div');
+                slideDivs.forEach(div => {
+                    const image = div.querySelector('.slide-image')?.value || '';
+                    const caption = div.querySelector('.slide-caption')?.value || '';
+                    const description = div.querySelector('.slide-desc')?.value || '';
+                    const alt = div.querySelector('.slide-alt')?.value || '';
+                    if (image) slides.push({ image, caption, description, alt });
+                });
+                settings = {
+                    autoplay: document.getElementById('carousel_autoplay')?.value === 'true',
+                    interval: parseInt(document.getElementById('carousel_interval')?.value) || 5000,
+                    slides: slides
+                };
+            } else {
+                settings = document.getElementById('custom_html')?.value || '';
+            }
+            const data = {
+                id: document.getElementById('block_id').value,
+                blockName: document.getElementById('block_name').value,
+                type: type,
+                settings: JSON.stringify(settings),
+                order: document.getElementById('block_order').value,
+                location: document.getElementById('block_location').value
+            };
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
             location.reload();
         };
         window.editBlock = (id) => openBlockModal(id);
         window.deleteBlock = async (id) => { if(confirm('Delete block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
 
-        // Pages
+        // Pages CRUD
         window.openPageModal = (id=null) => {
             const page = id ? store.pages.find(p => p.ID == id) : { ID:'', Slug:'', Title:'', Content:'', MenuOrder:0, Status:'published', ParentID:'' };
             const parentOptions = `<option value="">None (Root)</option>` + (store.pages || []).filter(p => p.ID !== page.ID).map(p => `<option value="${p.ID}" ${page.ParentID===p.ID?'selected':''}>${escapeHtml(p.Title)}</option>`).join('');
@@ -305,9 +508,9 @@
             location.reload();
         };
         window.editPage = (id) => openPageModal(id);
-        window.deletePage = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
+        window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
 
-        // Products with image upload
+        // Products CRUD with image upload
         window.openProductModal = (id=null) => {
             const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
             const catOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category===c.ID?'selected':''}>${escapeHtml(c.Name)}</option>`).join('');
@@ -342,7 +545,7 @@
         window.closeModal = (id) => { const el = document.getElementById(id); if (el) el.remove(); };
         function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 
-        window.addEventListener('hashchange', router);
+        window.addEventListener('hashchange', () => { injectSeoMetaTags(); router(); });
         window.addEventListener('load', fetchData);
         async function router() {
             const hash = location.hash || '#/';
