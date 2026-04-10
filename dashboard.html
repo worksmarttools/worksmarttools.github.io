@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <style>
+        body { font-family: sans-serif; padding: 50px; text-align: center; }
+        .card { border: 1px solid #ddd; padding: 20px; display: inline-block; border-radius: 10px; }
+        button { margin-top: 20px; padding: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Welcome to the Dashboard</h1>
+        <p>You have successfully logged in via Google Sheets API.</p>
+        <button onclick="logout()">Logout</button>
+    </div>
+
+    <script>
+        function logout() {
+            // Simple redirect back to login
+            window.location.href = "index.html";
+        }
+    </script>
+</body>
+</html>
