@@ -289,7 +289,7 @@
         function renderProductsTable() {
             const container = document.getElementById('productsTable');
             if (!container) return;
-            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th><tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody>在美国</div>`;
+            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th><tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></table>`;
         }
 
         function renderCategoriesList() {
