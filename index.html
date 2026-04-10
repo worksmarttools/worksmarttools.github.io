@@ -166,7 +166,7 @@
             reader.readAsDataURL(file);
         }
 
-        // ======================== HOME PAGE BLOCK RENDERING (FIXED) ========================
+        // ======================== HOME PAGE BLOCK RENDERING ========================
         function renderBlocks(blocks, container) {
             const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
             for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
@@ -174,21 +174,19 @@
                     let settings = null;
                     // Parse settings based on block type
                     if (block.Type === 'rich_text') {
-                        // Rich text stores raw HTML string, not JSON
-                        settings = block.Settings;
-                    } else if (block.Type === 'hero_image' || block.Type === 'carousel') {
-                        // These types store JSON string
+                        // Rich text stores an object: { title, content }
                         if (block.Settings) {
-                            if (typeof block.Settings === 'string') {
-                                settings = JSON.parse(block.Settings);
-                            } else {
-                                settings = block.Settings;
-                            }
+                            settings = typeof block.Settings === 'string' ? JSON.parse(block.Settings) : block.Settings;
+                        } else {
+                            settings = { title: '', content: '' };
+                        }
+                    } else if (block.Type === 'hero_image' || block.Type === 'carousel') {
+                        if (block.Settings) {
+                            settings = typeof block.Settings === 'string' ? JSON.parse(block.Settings) : block.Settings;
                         } else {
                             settings = {};
                         }
                     } else {
-                        // For other types (company_name, tagline, etc.) no settings needed
                         settings = {};
                     }
 
@@ -223,9 +221,10 @@
                         `).join('');
                         container.innerHTML += `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">${productsHtml}</div>`;
                     } else if (block.Type === 'custom_html' || block.Type === 'rich_text') {
-                        // For rich_text, settings is the raw HTML string
-                        const content = (block.Type === 'rich_text') ? (settings || '') : (typeof settings === 'string' ? settings : JSON.stringify(settings));
-                        container.innerHTML += `<div class="mb-12 prose max-w-none">${content}</div>`;
+                        // For rich_text, settings contains { title, content }
+                        const titleHtml = (settings.title && settings.title.trim()) ? `<h2 class="text-3xl font-bold dynamic-text mb-6 text-center">${escapeHtml(settings.title)}</h2>` : '';
+                        const content = settings.content || '';
+                        container.innerHTML += `<div class="mb-12 prose max-w-none">${titleHtml}${content}</div>`;
                     }
                 } catch(e) { console.error('Block render error:', block, e); }
             }
@@ -381,7 +380,7 @@
                 settings = {};
             } else if (type === 'rich_text') {
                 blockName = 'Rich Text Block';
-                settings = '<p>Enter your content here...</p>';
+                settings = { title: '', content: '<p>Enter your content here...</p>' };
             }
             const maxOrder = Math.max(0, ...(store.contentBlocks || []).map(b => b.Order || 0));
             const data = { id: '', blockName, type, settings: JSON.stringify(settings), order: maxOrder + 1, location: 'homepage' };
@@ -390,21 +389,21 @@
             fetchData();
         }
 
-        // ======================== BLOCK MODAL (FIXED) ========================
+        // ======================== BLOCK MODAL (FIXED - added title field for rich_text) ========================
         window.openBlockModal = (id=null) => {
             const block = id ? store.contentBlocks.find(b => b.BlockID == id) : null;
             if (!block) return;
             let settings = null;
             // Parse settings based on block type
             if (block.Type === 'rich_text') {
-                settings = block.Settings; // raw HTML string
+                try {
+                    settings = typeof block.Settings === 'string' ? JSON.parse(block.Settings) : block.Settings;
+                } catch(e) { settings = { title: '', content: '' }; }
+                if (!settings.title) settings.title = '';
+                if (!settings.content) settings.content = '';
             } else {
                 try {
-                    if (block.Settings) {
-                        settings = typeof block.Settings === 'string' ? JSON.parse(block.Settings) : block.Settings;
-                    } else {
-                        settings = {};
-                    }
+                    settings = block.Settings ? (typeof block.Settings === 'string' ? JSON.parse(block.Settings) : block.Settings) : {};
                 } catch(e) { settings = {}; }
             }
             const modal = document.createElement('div'); modal.id = 'blockModal'; modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
@@ -449,12 +448,14 @@
                 };
                 renderSlides();
             } else if (block.Type === 'rich_text') {
-                const editorDiv = document.createElement('div'); editorDiv.id = 'richEditor'; editorDiv.style.height = '300px';
-                container.appendChild(editorDiv);
+                // Add title field and rich text editor
+                container.innerHTML = `
+                    <div class="mb-4"><label class="block font-bold mb-1">Section Title (Optional)</label><input type="text" id="rich_title" class="w-full border p-2 rounded" placeholder="Enter section title" value="${escapeHtml(settings.title||'')}"></div>
+                    <div><label class="block font-bold mb-1">Content</label><div id="richEditor" style="height: 300px;"></div></div>`;
                 setTimeout(() => {
                     if (quillEditor) quillEditor = null;
                     quillEditor = new Quill('#richEditor', { theme: 'snow', modules: { toolbar: [['bold','italic','underline','strike'], [{'size': ['small',false,'large','huge']}], [{'color': []}], [{'align': []}], ['link','image'], ['clean']] } });
-                    quillEditor.root.innerHTML = settings || '';
+                    quillEditor.root.innerHTML = settings.content || '';
                 }, 50);
             } else {
                 container.innerHTML = `<p class="text-slate-500">This block pulls data from Company Info and cannot be edited here.</p>`;
@@ -471,11 +472,13 @@
                     });
                     newSettings = { autoplay: document.getElementById('carousel_autoplay')?.value === 'true', interval: parseInt(document.getElementById('carousel_interval')?.value) || 5000, slides };
                 } else if (block.Type === 'rich_text') {
-                    newSettings = quillEditor ? quillEditor.root.innerHTML : settings;
+                    const title = document.getElementById('rich_title')?.value || '';
+                    const content = quillEditor ? quillEditor.root.innerHTML : '';
+                    newSettings = { title, content };
                 } else {
                     newSettings = settings;
                 }
-                const data = { id: block.BlockID, blockName: block.BlockName, type: block.Type, settings: (block.Type === 'rich_text') ? newSettings : JSON.stringify(newSettings), order: block.Order, location: block.Location };
+                const data = { id: block.BlockID, blockName: block.BlockName, type: block.Type, settings: JSON.stringify(newSettings), order: block.Order, location: block.Location };
                 await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
                 closeModal('blockModal');
                 showToast('Block saved');
@@ -494,7 +497,7 @@
         function renderProductsTable() {
             const container = document.getElementById('productsTable');
             if (!container) return;
-            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th><tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></div>`;
+            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></div>`;
         }
 
         function renderCategoriesList() {
