@@ -166,15 +166,35 @@
             reader.readAsDataURL(file);
         }
 
+        // ======================== RICH TEXT IMAGE UPLOAD HANDLER ========================
+        async function uploadRichTextImage(file, editorCursor) {
+            // Convert file to base64
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Data = e.target.result.split(',')[1];
+                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'uploadImage', data: { file: base64Data, filename: file.name, mimeType: file.type } }) });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    // Insert the Drive URL into the editor
+                    const range = editorCursor.index;
+                    const length = editorCursor.length || 0;
+                    quillEditor.insertEmbed(range, 'image', json.url);
+                    quillEditor.setSelection(range + 1);
+                    showToast('Image uploaded and inserted');
+                } else {
+                    showToast('Upload failed', true);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
         // ======================== HOME PAGE BLOCK RENDERING ========================
         function renderBlocks(blocks, container) {
             const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
             for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
                 try {
                     let settings = null;
-                    // Parse settings based on block type
                     if (block.Type === 'rich_text') {
-                        // Rich text stores an object: { title, content }
                         if (block.Settings) {
                             settings = typeof block.Settings === 'string' ? JSON.parse(block.Settings) : block.Settings;
                         } else {
@@ -221,7 +241,6 @@
                         `).join('');
                         container.innerHTML += `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">${productsHtml}</div>`;
                     } else if (block.Type === 'custom_html' || block.Type === 'rich_text') {
-                        // For rich_text, settings contains { title, content }
                         const titleHtml = (settings.title && settings.title.trim()) ? `<h2 class="text-3xl font-bold dynamic-text mb-6 text-center">${escapeHtml(settings.title)}</h2>` : '';
                         const content = settings.content || '';
                         container.innerHTML += `<div class="mb-12 prose max-w-none">${titleHtml}${content}</div>`;
@@ -237,7 +256,7 @@
             renderBlocks(blocks, container);
         }
 
-        // ======================== PRODUCTS & PAGES (unchanged) ========================
+        // ======================== PRODUCTS & PAGES ========================
         function renderProductList(container) {
             const filtered = activeCategoryFilter === "all" ? store.products : store.products.filter(p => p.Category == activeCategoryFilter);
             container.innerHTML = `
@@ -389,12 +408,11 @@
             fetchData();
         }
 
-        // ======================== BLOCK MODAL (FIXED - added title field for rich_text) ========================
+        // ======================== BLOCK MODAL (with image upload for rich text) ========================
         window.openBlockModal = (id=null) => {
             const block = id ? store.contentBlocks.find(b => b.BlockID == id) : null;
             if (!block) return;
             let settings = null;
-            // Parse settings based on block type
             if (block.Type === 'rich_text') {
                 try {
                     settings = typeof block.Settings === 'string' ? JSON.parse(block.Settings) : block.Settings;
@@ -448,13 +466,42 @@
                 };
                 renderSlides();
             } else if (block.Type === 'rich_text') {
-                // Add title field and rich text editor
                 container.innerHTML = `
                     <div class="mb-4"><label class="block font-bold mb-1">Section Title (Optional)</label><input type="text" id="rich_title" class="w-full border p-2 rounded" placeholder="Enter section title" value="${escapeHtml(settings.title||'')}"></div>
                     <div><label class="block font-bold mb-1">Content</label><div id="richEditor" style="height: 300px;"></div></div>`;
                 setTimeout(() => {
                     if (quillEditor) quillEditor = null;
-                    quillEditor = new Quill('#richEditor', { theme: 'snow', modules: { toolbar: [['bold','italic','underline','strike'], [{'size': ['small',false,'large','huge']}], [{'color': []}], [{'align': []}], ['link','image'], ['clean']] } });
+                    quillEditor = new Quill('#richEditor', {
+                        theme: 'snow',
+                        modules: {
+                            toolbar: {
+                                container: [
+                                    ['bold', 'italic', 'underline', 'strike'],
+                                    [{ 'size': ['small', false, 'large', 'huge'] }],
+                                    [{ 'color': [] }],
+                                    [{ 'align': [] }],
+                                    ['link', 'image'],
+                                    ['clean']
+                                ],
+                                handlers: {
+                                    image: function() {
+                                        // Create file input for image upload
+                                        const input = document.createElement('input');
+                                        input.setAttribute('type', 'file');
+                                        input.setAttribute('accept', 'image/*');
+                                        input.onchange = async () => {
+                                            const file = input.files[0];
+                                            if (file) {
+                                                const range = quillEditor.getSelection(true);
+                                                await uploadRichTextImage(file, range);
+                                            }
+                                        };
+                                        input.click();
+                                    }
+                                }
+                            }
+                        }
+                    });
                     quillEditor.root.innerHTML = settings.content || '';
                 }, 50);
             } else {
