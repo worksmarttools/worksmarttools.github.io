@@ -48,6 +48,16 @@
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
                 const json = await res.json();
                 store = json.data;
+                // Fix: map ContentBlocks correctly (sheet uses "Content" column, not "Settings")
+                if (store.contentBlocks) {
+                    store.contentBlocks = store.contentBlocks.map(block => {
+                        // If the block has a "Content" field, rename it to "Settings" for internal use
+                        if (block.Content !== undefined && block.Settings === undefined) {
+                            block.Settings = block.Content;
+                        }
+                        return block;
+                    });
+                }
                 applyTheme();
                 buildHierarchicalMenu();
                 renderFooter();
@@ -91,17 +101,14 @@
             document.getElementById('siteFooter').innerHTML = `<div class="container mx-auto px-4 text-center"><p class="font-black text-lg mb-4 uppercase tracking-[0.3em]">${document.getElementById('siteName').innerText}</p><p class="text-slate-400 font-medium text-sm">${escapeHtml(f.copyright_text || '© 2025 ALL RIGHTS RESERVED')}</p></div>`;
         }
 
-        // SEO: Global only affects meta description/keywords, not page title
         function injectSeoMetaTags() {
             const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
             const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
             const hash = window.location.hash;
-            
             let pageTitle = company.site_title || "WorkSmart";
             let metaDescription = seo.default_description || company.company_moto || "";
             let metaKeywords = seo.default_keywords || "";
             let ogImage = seo.default_og_image || "";
-            
             if (hash.startsWith('#/product/')) {
                 const prod = store.products.find(p => p.ID === hash.split('/')[2]);
                 if (prod) {
@@ -117,7 +124,6 @@
                     metaDescription = page.Content.replace(/<[^>]*>/g, '').substring(0, 160);
                 }
             }
-            
             document.title = pageTitle;
             setMetaTag('description', metaDescription);
             if (metaKeywords) setMetaTag('keywords', metaKeywords);
@@ -127,7 +133,6 @@
             setMetaTag('twitter:card', 'summary_large_image');
             if (seo.twitter_handle) setMetaTag('twitter:site', seo.twitter_handle);
         }
-        
         function setMetaTag(name, content) { if(!content) return; let meta = document.querySelector(`meta[name="${name}"]`); if(!meta) { meta = document.createElement('meta'); meta.name = name; document.head.appendChild(meta); } meta.content = content; }
 
         // ======================== IMAGE UPLOAD ========================
@@ -147,7 +152,7 @@
             reader.readAsDataURL(file);
         }
 
-        // ======================== BLOCK RENDERING (HOME) - FIXED HERO ========================
+        // ======================== BLOCK RENDERING (HOME) ========================
         function renderBlocks(blocks, container) {
             for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
                 try {
@@ -180,7 +185,6 @@
             }
         }
 
-        // ======================== PUBLIC VIEWS ========================
         function renderHome(container) {
             const blocks = (store.contentBlocks || []).filter(b => b.Location === 'homepage').sort((a,b)=>a.Order-b.Order);
             if (!blocks.length) { container.innerHTML = '<div class="text-center py-20">Add content blocks in Admin → Content Blocks</div>'; return; }
@@ -285,7 +289,7 @@
         function renderProductsTable() {
             const container = document.getElementById('productsTable');
             if (!container) return;
-            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></table>`;
+            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th><tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody>在美国</div>`;
         }
 
         function renderCategoriesList() {
@@ -304,13 +308,13 @@
         window.saveFooter = async () => { const data = { copyright_text: document.getElementById('footer_copyright')?.value, footer_links: document.getElementById('footer_links')?.value, footer_html: document.getElementById('footer_html')?.value }; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateFooter', data }) }); location.reload(); };
         window.addCategory = async () => { const name = document.getElementById('newCatName')?.value; if(!name) return; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveCategory', data:{ name } }) }); location.reload(); };
         
-        // GLOBAL DELETE FUNCTIONS - FIXED
+        // GLOBAL DELETE FUNCTIONS - FIXED (exposed to window)
         window.deleteProductItem = async (id) => { if(confirm('Permanently delete this product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
         window.deletePageItem = async (id) => { if(confirm('Permanently delete this page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
         window.deleteBlock = async (id) => { if(confirm('Permanently delete this content block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
         window.deleteCategoryItem = async (id) => { if(confirm('Permanently delete this category?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); location.reload(); } };
 
-        // ======================== PRODUCT MODAL (EDIT & CREATE) ========================
+        // ======================== PRODUCT MODAL ========================
         window.openProductModal = () => openProductModalEdit(null);
         window.openProductModalEdit = (id) => {
             const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
@@ -325,15 +329,50 @@
             };
         };
 
-        // ======================== BLOCK MODAL ========================
+        // ======================== BLOCK MODAL (FIXED CAROUSEL) ========================
         window.openBlockModal = (id=null) => {
             const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'hero_image', Settings:'{}', Order:0, Location:'homepage' };
             let settings = {};
             try { settings = JSON.parse(block.Settings); } catch(e) {}
             const modal = document.createElement('div'); modal.id = 'blockModal'; modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
-            modal.innerHTML = `<div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer"></div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
+            modal.innerHTML = `<div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3" onchange="toggleBlockSettings()"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer"></div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
             document.body.appendChild(modal);
-            const renderSettings = () => {
+            
+            // Helper for carousel slide upload
+            window.uploadSlideImage = function(btn) {
+                const fileInput = btn.previousElementSibling;
+                if (!fileInput.files.length) return;
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const base64Data = e.target.result.split(',')[1];
+                    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'uploadImage', data: { file: base64Data, filename: file.name, mimeType: file.type } }) });
+                    const json = await res.json();
+                    if (json.status === 'success') {
+                        const slideDiv = btn.closest('.border');
+                        slideDiv.querySelector('.slide-image').value = json.url;
+                        alert('Image uploaded!');
+                    } else alert('Upload failed');
+                };
+                reader.readAsDataURL(file);
+            };
+            
+            window.addCarouselSlide = function() {
+                const list = document.getElementById('carouselSlidesList');
+                const idx = list.children.length;
+                const div = document.createElement('div');
+                div.className = 'border p-3 rounded mb-2';
+                div.innerHTML = `<h4>Slide ${idx+1}</h4>
+                    <div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div>
+                    <input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1">
+                    <input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1">
+                    <textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea>
+                    <input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded">
+                    <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                list.appendChild(div);
+            };
+            
+            window.toggleBlockSettings = function() {
                 const type = document.getElementById('block_type').value;
                 const container = document.getElementById('settingsContainer');
                 if (type === 'hero_image') {
@@ -341,34 +380,28 @@
                 } else if (type === 'carousel') {
                     const slides = settings.slides || [];
                     container.innerHTML = `<label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${settings.autoplay?'selected':''}>Yes</option><option value="false" ${!settings.autoplay?'selected':''}>No</option></select><label>Interval (ms)</label><input id="carousel_interval" type="number" value="${settings.interval||5000}" class="w-full border p-2 rounded mb-4"><div id="carouselSlidesList"></div><button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>`;
-                    const renderSlides = () => {
-                        const list = document.getElementById('carouselSlidesList');
-                        if (!list) return;
-                        list.innerHTML = '';
+                    const listDiv = document.getElementById('carouselSlidesList');
+                    if (listDiv) {
+                        listDiv.innerHTML = '';
                         slides.forEach((slide, idx) => {
-                            const div = document.createElement('div'); div.className = 'border p-3 rounded mb-2';
-                            div.innerHTML = `<h4>Slide ${idx+1}</h4><div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this, ${idx})" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div><input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea><input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
-                            list.appendChild(div);
+                            const div = document.createElement('div');
+                            div.className = 'border p-3 rounded mb-2';
+                            div.innerHTML = `<h4>Slide ${idx+1}</h4>
+                                <div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div>
+                                <input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1">
+                                <input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1">
+                                <textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea>
+                                <input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded">
+                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                            listDiv.appendChild(div);
                         });
-                    };
-                    window.uploadSlideImage = (btn, idx) => {
-                        const fileInput = btn.previousElementSibling;
-                        if (!fileInput.files.length) return;
-                        const fd = new FormData(); fd.append('action', 'uploadImage'); fd.append('file', fileInput.files[0]); fd.append('filename', fileInput.files[0].name);
-                        fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'uploadImage', data:{ file: fileInput.files[0] } }) }).then(r=>r.json()).then(json=>{ if(json.status==='success') btn.closest('.border').querySelector('.slide-image').value = json.url; });
-                    };
-                    window.addCarouselSlide = () => {
-                        const list = document.getElementById('carouselSlidesList');
-                        const div = document.createElement('div'); div.className = 'border p-3 rounded mb-2';
-                        div.innerHTML = `<h4>Slide ${list.children.length+1}</h4><div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this, null)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div><input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea><input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
-                        list.appendChild(div);
-                    };
-                    renderSlides();
+                    }
                 } else {
                     container.innerHTML = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded">${escapeHtml(block.Settings)}</textarea>`;
                 }
             };
-            renderSettings();
+            toggleBlockSettings();
+            
             window.submitBlock = async () => {
                 const type = document.getElementById('block_type').value;
                 let settings = {};
@@ -376,7 +409,10 @@
                     settings = { image: document.getElementById('hero_image')?.value, caption: document.getElementById('hero_caption')?.value, description: document.getElementById('hero_desc')?.value, alt: document.getElementById('hero_alt')?.value, buttonText: document.getElementById('hero_btn_text')?.value, buttonLink: document.getElementById('hero_btn_link')?.value };
                 } else if (type === 'carousel') {
                     const slides = [];
-                    document.querySelectorAll('#carouselSlidesList > div').forEach(div => { const img = div.querySelector('.slide-image')?.value; if(img) slides.push({ image: img, caption: div.querySelector('.slide-caption')?.value, description: div.querySelector('.slide-desc')?.value, alt: div.querySelector('.slide-alt')?.value }); });
+                    document.querySelectorAll('#carouselSlidesList > div').forEach(div => {
+                        const img = div.querySelector('.slide-image')?.value;
+                        if (img) slides.push({ image: img, caption: div.querySelector('.slide-caption')?.value, description: div.querySelector('.slide-desc')?.value, alt: div.querySelector('.slide-alt')?.value });
+                    });
                     settings = { autoplay: document.getElementById('carousel_autoplay')?.value === 'true', interval: parseInt(document.getElementById('carousel_interval')?.value) || 5000, slides };
                 } else {
                     settings = document.getElementById('custom_html')?.value;
