@@ -3,200 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WorkSmart Tools</title>
+    <title>WorkSmart Tools | Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style id="theme-styles">
-        :root { --primary-color: #2563eb; --base-font: 16px; }
-        .dynamic-bg { background-color: var(--primary-color); }
-        .dynamic-text { color: var(--primary-color); }
-        .dynamic-border { border-color: var(--primary-color); }
-        body { font-size: var(--base-font); transition: all 0.3s ease; }
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --p-color: #2563eb; }
+        body { font-family: 'Inter', sans-serif; transition: all 0.3s ease; }
+        .dynamic-bg { background-color: var(--p-color); }
+        .dynamic-text { color: var(--p-color); }
+        .dynamic-border { border-color: var(--p-color); }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
 
-    <nav class="bg-white/80 backdrop-blur-md shadow-sm p-4 sticky top-0 z-50">
+    <nav class="glass shadow-sm p-4 sticky top-0 z-50 border-b border-white">
         <div class="container mx-auto flex justify-between items-center">
             <div class="flex items-center gap-3 cursor-pointer" onclick="location.hash='#/'">
-                <img id="site-logo" src="" class="h-8 hidden">
-                <span id="site-name" class="text-xl font-black tracking-tighter">WORKS_MART</span>
+                <img id="site-logo" src="" class="h-8 hidden rounded">
+                <span id="site-name" class="text-xl font-extrabold tracking-tight">WORKS_MART</span>
             </div>
-            <div id="nav-links" class="hidden md:flex space-x-8 font-semibold text-slate-600 text-sm uppercase tracking-widest">
-                </div>
-            <a href="#/admin-as" class="text-[10px] border px-3 py-1 rounded-full uppercase font-bold tracking-tighter hover:bg-black hover:text-white transition">Admin Portal</a>
+            <div id="nav-links" class="hidden md:flex space-x-8 font-semibold text-slate-500 text-xs uppercase tracking-widest"></div>
+            <a href="#/admin-as" class="text-[10px] bg-slate-900 text-white px-4 py-2 rounded-full font-bold uppercase tracking-tighter hover:opacity-80 transition">Dashboard</a>
         </div>
     </nav>
 
     <main id="app" class="container mx-auto p-6 min-h-screen"></main>
 
-    <footer class="py-12 text-center text-slate-400 text-xs border-t bg-white">
+    <footer class="py-12 text-center text-slate-400 text-xs border-t bg-white mt-20">
         <p id="footer-text">&copy; WorkSmart Tools</p>
     </footer>
 
     <script>
-        // 1. UPDATE THIS URL
-        const API_URL = "https://script.google.com/macros/s/AKfycbz-1L3hT0vN0BKFf86Z2B6C6exRHLKRFS84Ox-SlSgxIzteddAAh981av7396VZbh89/exec";
-        
+        const API_URL = "https://script.google.com/macros/s/AKfycbyOVeobpIrsdxMb0qic8Df4acIGUZJ_bBfxhg8h6wm6jDNtZToGhOk3T3_NEkRS4HqM/exec"; // UPDATE THIS
         let store = { company: [], products: [] };
 
-        // 2. ROUTING LOGIC
+        // ROUTER
         window.addEventListener('hashchange', router);
-        window.addEventListener('load', async () => {
-            await fetchData();
-            router();
-        });
+        window.addEventListener('load', async () => { await fetchData(); router(); });
 
         async function fetchData() {
             try {
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' })});
                 store = await res.json();
                 applyTheme();
-            } catch (e) { console.error("Database connection failed."); }
+            } catch (e) { console.error("Sync Error"); }
         }
 
         function applyTheme() {
             const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
             document.title = s.site_title || "WorkSmart Tools";
             document.getElementById('site-name').innerText = s.company_name || "WorkSmart";
-            
             const logo = document.getElementById('site-logo');
             if(s.logo_url) { logo.src = s.logo_url; logo.classList.remove('hidden'); }
-
             const root = document.documentElement;
-            if(s.primary_color) root.style.setProperty('--primary-color', s.primary_color);
-            if(s.font_size) root.style.setProperty('--base-font', s.font_size + "px");
-
-            const menu = (s.menu_items || "Home").split(',').map(m => `<a href="#/" class="hover:dynamic-text transition">${m.trim()}</a>`).join('');
-            document.getElementById('nav-links').innerHTML = menu;
+            if(s.primary_color) root.style.setProperty('--p-color', s.primary_color);
+            if(s.font_size) document.body.style.fontSize = s.font_size + "px";
+            document.getElementById('nav-links').innerHTML = (s.menu_items || "Home").split(',').map(m => `<a href="#/" class="hover:dynamic-text">${m.trim()}</a>`).join('');
         }
 
         function router() {
             const path = window.location.hash || '#/';
             const app = document.getElementById('app');
-
             if (path === '#/') renderHome(app);
             else if (path.startsWith('#/product/')) renderProduct(app, path.split('/')[2]);
             else if (path === '#/admin-as') renderAdmin(app);
         }
 
-        // 3. HOME VIEW
+        // VIEWS
         function renderHome(container) {
             const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
             container.innerHTML = `
-                <section class="py-20 text-center">
-                    <h1 class="text-6xl font-black mb-6 italic tracking-tighter">${s.site_title || 'WorkSmart'}</h1>
-                    <p class="text-xl text-slate-500 max-w-xl mx-auto">${s.company_desc || ''}</p>
+                <section class="py-24 text-center">
+                    <h1 class="text-7xl font-black mb-6 tracking-tighter italic text-slate-900">${s.site_title || 'WorkSmart'}</h1>
+                    <p class="text-xl text-slate-400 max-w-2xl mx-auto">${s.company_desc || ''}</p>
                 </section>
-                <div class="grid md:grid-cols-3 gap-10">
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-12">
                     ${store.products.map(p => `
-                        <div class="bg-white rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all cursor-pointer group border border-slate-100" onclick="location.hash='#/product/${p.ID}'">
-                            <img src="${p.Thumbnail}" class="w-full h-64 object-cover group-hover:scale-105 transition duration-500">
-                            <div class="p-8">
-                                <h3 class="font-black text-xl mb-3 uppercase">${p.Title}</h3>
-                                <p class="text-slate-400 text-sm">${p.Summary}</p>
+                        <div class="bg-white rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 cursor-pointer group border border-slate-100" onclick="location.hash='#/product/${p.ID}'">
+                            <img src="${p.Thumbnail}" class="w-full h-72 object-cover group-hover:scale-110 transition duration-700">
+                            <div class="p-10">
+                                <h3 class="font-extrabold text-2xl mb-4 tracking-tight uppercase italic">${p.Title}</h3>
+                                <p class="text-slate-400 text-sm leading-relaxed">${p.Summary}</p>
                             </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
+                        </div>`).join('')}
+                </div>`;
         }
 
-        // 4. PRODUCT VIEW
         function renderProduct(container, id) {
             const p = store.products.find(x => x.ID == id);
             if(!p) return container.innerHTML = "Not Found";
             container.innerHTML = `
-                <div class="max-w-4xl mx-auto py-10">
-                    <button onclick="history.back()" class="mb-10 text-slate-400 font-bold hover:text-black uppercase text-xs tracking-widest">← Return to Collection</button>
-                    <div class="grid md:grid-cols-2 gap-12">
-                        <img src="${p.Thumbnail}" class="w-full rounded-[3rem] shadow-2xl">
+                <div class="max-w-5xl mx-auto py-10">
+                    <button onclick="history.back()" class="mb-12 text-slate-400 font-bold hover:text-black uppercase text-[10px] tracking-[0.2em]">← Return Home</button>
+                    <div class="grid md:grid-cols-2 gap-20 items-center">
+                        <img src="${p.Thumbnail}" class="w-full rounded-[4rem] shadow-3xl">
                         <div>
-                            <h1 class="text-5xl font-black mb-8 italic">${p.Title}</h1>
-                            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 mb-6">
-                                <h5 class="text-[10px] font-black text-slate-300 uppercase mb-4 tracking-widest">Specifications</h5>
-                                <div class="text-sm leading-relaxed text-slate-600">${p.Technical_Info}</div>
+                            <h1 class="text-6xl font-black mb-10 tracking-tighter italic">${p.Title}</h1>
+                            <div class="bg-white p-10 rounded-[2rem] border border-slate-100 shadow-sm">
+                                <h5 class="text-[10px] font-black text-slate-300 uppercase mb-6 tracking-widest">Tech Specs</h5>
+                                <div class="text-sm text-slate-600 leading-loose">${p.Technical_Info.replace(/\n/g, '<br>')}</div>
                             </div>
                         </div>
                     </div>
-                    <div class="mt-16 prose max-w-none">
-                        <h2 class="text-2xl font-black mb-6 border-b pb-4">Overview</h2>
-                        <div class="text-lg text-slate-600 leading-relaxed">${p.Description}</div>
+                    <div class="mt-24 max-w-3xl">
+                        <h2 class="text-3xl font-black mb-8 italic">Product Overview</h2>
+                        <div class="text-xl text-slate-500 leading-relaxed font-light">${p.Description}</div>
                     </div>
-                </div>
-            `;
+                </div>`;
         }
 
-        // 5. ADMIN VIEW
+        // ADMIN LOGIC
         function renderAdmin(container) {
             const token = localStorage.getItem('ws_token');
             if(!token) {
                 container.innerHTML = `
-                    <div class="max-w-md mx-auto bg-white p-12 rounded-[2.5rem] shadow-xl mt-20 border">
-                        <h2 class="text-3xl font-black mb-10 text-center tracking-tighter italic">ADMIN_LOGIN</h2>
-                        <input id="u" placeholder="Username" class="w-full border-b py-4 mb-4 outline-none">
-                        <input id="p" type="password" placeholder="Password" class="w-full border-b py-4 mb-10 outline-none">
-                        <button onclick="login()" class="w-full dynamic-bg text-white p-5 rounded-2xl font-black shadow-lg">AUTHENTICATE</button>
+                    <div class="max-w-md mx-auto bg-white p-12 rounded-[3rem] shadow-2xl mt-20 border border-slate-100">
+                        <h2 class="text-3xl font-black mb-10 text-center italic tracking-tight">SECURE_AUTH</h2>
+                        <input id="u" placeholder="Username" class="w-full border-b py-4 mb-4 outline-none font-medium">
+                        <input id="p" type="password" placeholder="Password" class="w-full border-b py-4 mb-12 outline-none font-medium">
+                        <button onclick="login()" class="w-full dynamic-bg text-white py-5 rounded-2xl font-black tracking-widest hover:opacity-90">LOGIN</button>
                     </div>`;
             } else {
                 const s = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
                 container.innerHTML = `
-                    <div class="flex justify-between items-end mb-16">
-                        <h2 class="text-4xl font-black tracking-tighter">CONTROL_PANEL</h2>
-                        <button onclick="logout()" class="text-xs font-bold text-red-500 hover:underline">TERMINATE_SESSION</button>
+                    <div class="flex justify-between items-center mb-16">
+                        <h2 class="text-4xl font-black tracking-tighter italic">CONSOLE</h2>
+                        <button onclick="logout()" class="text-xs font-bold text-slate-400 hover:text-red-500">SIGN_OUT</button>
                     </div>
 
-                    <div class="grid lg:grid-cols-2 gap-12 mb-20">
-                        <div class="bg-white p-10 rounded-[2rem] border shadow-sm">
-                            <h3 class="font-black text-lg mb-8 text-blue-600 italic">SITE_BRANDING</h3>
+                    <div class="grid lg:grid-cols-2 gap-10 mb-10">
+                        <div class="bg-white p-10 rounded-[2.5rem] border shadow-sm">
+                            <h3 class="font-black text-blue-600 mb-8 uppercase text-xs tracking-widest">Branding</h3>
                             <input id="set_title" value="${s.site_title || ''}" placeholder="Site Title" class="w-full border-b py-3 mb-6 outline-none">
                             <input id="set_name" value="${s.company_name || ''}" placeholder="Company Name" class="w-full border-b py-3 mb-6 outline-none">
-                            <textarea id="set_desc" placeholder="Global Description" class="w-full border-b py-3 mb-6 outline-none h-20">${s.company_desc || ''}</textarea>
+                            <textarea id="set_desc" placeholder="Global Description" class="w-full border-b py-3 mb-6 outline-none h-24">${s.company_desc || ''}</textarea>
                             <input id="set_logo" value="${s.logo_url || ''}" placeholder="Logo URL" class="w-full border-b py-3 outline-none">
                         </div>
-                        <div class="bg-white p-10 rounded-[2rem] border shadow-sm">
-                            <h3 class="font-black text-lg mb-8 text-purple-600 italic">UI_SYSTEM</h3>
-                            <label class="text-[10px] font-black text-slate-300">ACCENT_COLOR</label>
+                        <div class="bg-white p-10 rounded-[2.5rem] border shadow-sm">
+                            <h3 class="font-black text-purple-600 mb-8 uppercase text-xs tracking-widest">Theme</h3>
+                            <label class="text-[10px] font-bold text-slate-300">ACCENT_COLOR</label>
                             <input id="set_color" type="color" value="${s.primary_color || '#2563eb'}" class="w-full h-12 mb-8 cursor-pointer border-none">
                             <input id="set_font" type="number" value="${s.font_size || '16'}" placeholder="Base Font (px)" class="w-full border-b py-3 mb-6 outline-none">
                             <input id="set_menu" value="${s.menu_items || ''}" placeholder="Menu (Comma Separated)" class="w-full border-b py-3 outline-none">
                         </div>
                     </div>
-                    <button onclick="saveSettings()" class="bg-black text-white px-12 py-5 rounded-2xl font-black mb-20">COMMIT_CHANGES</button>
+                    <button onclick="saveSettings()" class="bg-slate-900 text-white px-12 py-5 rounded-2xl font-black mb-20 shadow-xl hover:bg-black transition">SAVE_CONFIG</button>
 
                     <div class="flex justify-between items-center mb-10">
-                        <h2 class="text-2xl font-black">INVENTORY</h2>
-                        <button onclick="showAddProduct()" class="dynamic-bg text-white px-8 py-3 rounded-xl font-black">+ NEW_PRODUCT</button>
+                        <h2 class="text-3xl font-black italic tracking-tight">INVENTORY</h2>
+                        <button onclick="openProductModal()" class="dynamic-bg text-white px-10 py-4 rounded-2xl font-black shadow-lg hover:opacity-90">+ NEW_ENTRY</button>
                     </div>
-                    <div class="bg-white rounded-3xl border overflow-hidden">
+                    <div class="bg-white rounded-[2rem] border overflow-hidden shadow-sm">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 border-b">
-                                <tr><th class="p-6 text-[10px] font-black">PRODUCT</th><th class="p-6 text-[10px] font-black">ACTION</th></tr>
+                                <tr><th class="p-6 text-[10px] font-black text-slate-400">PRODUCT_NAME</th><th class="p-6 text-[10px] font-black text-slate-400 text-right">ACTIONS</th></tr>
                             </thead>
                             <tbody>
                                 ${store.products.map(p => `
-                                    <tr class="border-b last:border-0">
-                                        <td class="p-6 font-bold text-sm">${p.Title}</td>
-                                        <td class="p-6"><button onclick="deleteProduct('${p.ID}')" class="text-red-400 font-bold text-xs">DELETE</button></td>
-                                    </tr>
-                                `).join('')}
+                                    <tr class="border-b last:border-0 hover:bg-slate-50 transition">
+                                        <td class="p-6 font-bold text-slate-700">${p.Title}</td>
+                                        <td class="p-6 text-right space-x-4">
+                                            <button onclick="openProductModal('${p.ID}')" class="text-blue-500 font-bold text-xs uppercase">Edit</button>
+                                            <button onclick="deleteProduct('${p.ID}')" class="text-red-400 font-bold text-xs uppercase">Delete</button>
+                                        </td>
+                                    </tr>`).join('')}
                             </tbody>
                         </table>
-                    </div>
-                `;
+                    </div>`;
             }
         }
 
-        // 6. ACTIONS
+        // ACTIONS
         async function login() {
-            const res = await fetch(API_URL, { 
-                method: 'POST', 
-                body: JSON.stringify({ action: 'login', data: { username: document.getElementById('u').value, password: document.getElementById('p').value } })
-            });
+            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', data: { username: document.getElementById('u').value, password: document.getElementById('p').value } }) });
             const data = await res.json();
             if(data.status === 'success') { localStorage.setItem('ws_token', data.token); router(); }
-            else alert("Denied");
+            else alert("Access Denied");
         }
-
         function logout() { localStorage.removeItem('ws_token'); router(); }
 
         async function saveSettings() {
@@ -213,23 +197,32 @@
             location.reload();
         }
 
-        function showAddProduct() {
+        /**
+         * OPEN PRODUCT MODAL (For both Add and Edit)
+         */
+        function openProductModal(id = null) {
+            const p = id ? store.products.find(x => x.ID == id) : { ID: '', Title: '', Thumbnail: '', Summary: '', Description: '', Technical_Info: '', SEO_Title: '', SEO_Desc: '' };
             const html = `
-                <div id="modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-                    <div class="bg-white w-full max-w-4xl p-10 rounded-[2.5rem] max-h-[90vh] overflow-y-auto">
-                        <h2 class="text-2xl font-black mb-10 italic">APPEND_INVENTORY</h2>
+                <div id="modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] flex items-center justify-center p-6">
+                    <div class="bg-white w-full max-w-4xl p-12 rounded-[3rem] max-h-[90vh] overflow-y-auto shadow-2xl">
+                        <h2 class="text-3xl font-black mb-10 italic tracking-tight">${id ? 'EDIT_ENTRY' : 'CREATE_ENTRY'}</h2>
+                        <input type="hidden" id="p_id" value="${p.ID}">
                         <div class="grid md:grid-cols-2 gap-8">
-                            <input id="p_t" placeholder="Product Title" class="w-full border-b py-3 outline-none font-bold">
-                            <input id="p_th" placeholder="Thumbnail URL" class="w-full border-b py-3 outline-none">
-                            <textarea id="p_s" placeholder="Summary (Short)" class="w-full border-b py-3 outline-none"></textarea>
-                            <textarea id="p_te" placeholder="Tech Specs (Bullet Points)" class="w-full border-b py-3 outline-none"></textarea>
-                            <textarea id="p_d" placeholder="Full Description" class="md:col-span-2 w-full border-b py-3 outline-none h-32"></textarea>
-                            <input id="p_st" placeholder="SEO Title" class="w-full border-b py-3 outline-none">
-                            <input id="p_sd" placeholder="SEO Description" class="w-full border-b py-3 outline-none">
+                            <div class="space-y-6">
+                                <input id="p_t" value="${p.Title}" placeholder="Product Title" class="w-full border-b py-3 outline-none font-bold text-xl">
+                                <input id="p_th" value="${p.Thumbnail}" placeholder="Thumbnail URL" class="w-full border-b py-3 outline-none">
+                                <textarea id="p_s" placeholder="Summary (Short Description)" class="w-full border-b py-3 outline-none h-24">${p.Summary}</textarea>
+                                <textarea id="p_te" placeholder="Tech Specs (List Format)" class="w-full border-b py-3 outline-none h-24">${p.Technical_Info}</textarea>
+                            </div>
+                            <div class="space-y-6">
+                                <textarea id="p_d" placeholder="Full Product Narrative" class="w-full border-b py-3 outline-none h-40">${p.Description}</textarea>
+                                <input id="p_st" value="${p.SEO_Title}" placeholder="SEO Search Title" class="w-full border-b py-3 outline-none">
+                                <input id="p_sd" value="${p.SEO_Desc}" placeholder="SEO Search Meta Description" class="w-full border-b py-3 outline-none">
+                            </div>
                         </div>
-                        <div class="mt-12 flex gap-4">
-                            <button onclick="submitProduct()" class="dynamic-bg text-white px-10 py-4 rounded-2xl font-black">PUBLISH</button>
-                            <button onclick="document.getElementById('modal').remove()" class="bg-slate-100 px-10 py-4 rounded-2xl font-black">CANCEL</button>
+                        <div class="mt-12 flex gap-6">
+                            <button onclick="submitProduct()" class="dynamic-bg text-white px-12 py-5 rounded-2xl font-black shadow-xl">PUBLISH_CHANGES</button>
+                            <button onclick="document.getElementById('modal').remove()" class="bg-slate-100 px-12 py-5 rounded-2xl font-black text-slate-400">DISCARD</button>
                         </div>
                     </div>
                 </div>`;
@@ -238,6 +231,7 @@
 
         async function submitProduct() {
             const data = {
+                id: document.getElementById('p_id').value,
                 title: document.getElementById('p_t').value,
                 thumb: document.getElementById('p_th').value,
                 summary: document.getElementById('p_s').value,
@@ -251,7 +245,7 @@
         }
 
         async function deleteProduct(id) {
-            if(!confirm("Erase from inventory?")) return;
+            if(!confirm("Erase entry?")) return;
             await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: {id} }) });
             location.reload();
         }
