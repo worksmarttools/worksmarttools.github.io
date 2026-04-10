@@ -1,4 +1,4 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbyMkuMKxOw6WdmDspoz5AjjJW7BGRO71LKCqU7HiudDiqAVrsU08BD58-_CZUCbjPO5/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwmfa_qitTYgVA4oummscukjX7vXGFZCdbHPgZq7ZLnbffaaVhNbJvrHUVwfPOONufF/exec';
 
 const loginForm = document.getElementById('loginForm');
 const dashboard = document.getElementById('dashboard');
