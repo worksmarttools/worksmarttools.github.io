@@ -25,27 +25,35 @@
                 <span id="siteName" class="text-xl font-black dynamic-text">WORKSMART</span>
             </div>
             <div id="mainMenu" class="hidden md:flex items-center gap-6"></div>
+            <div class="flex items-center gap-4">
+                <button class="md:hidden p-2 text-slate-600">☰</button>
+            </div>
         </div>
     </nav>
 
     <main id="app" class="container mx-auto px-4 py-6 min-h-screen"></main>
 
-    <footer id="siteFooter" class="border-t mt-12 py-8 text-slate-500 text-sm"></footer>
+    <footer id="siteFooter" class="border-t mt-12 py-12 bg-white"></footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbwo83GBcF6M3iGzYvOIOdaCk6o2IdBPeIOa4v9yrA1yDuHBWUZRi0iX5XT-avmGxaME/exec"; // REPLACE
+        // UPDATE THIS URL AFTER DEPLOYING YOUR APPS SCRIPT
+        const API_URL = "https://script.google.com/macros/s/AKfycbziyBdgQpt2cb9VNZHW1QJ9dPVMEM1UFURP_eHhhAtvOvNAaF-VOKdYA1BOTgFV2klW/exec"; 
+        
         let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [], footer: [] };
         let activeCategoryFilter = "all";
 
+        // --- CORE ENGINE ---
         async function fetchData() {
-            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
-            const json = await res.json();
-            store = json.data;
-            applyTheme();
-            buildHierarchicalMenu();
-            renderFooter();
-            injectSeoMetaTags();
-            router();
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
+                const json = await res.json();
+                store = json.data;
+                applyTheme();
+                buildHierarchicalMenu();
+                renderFooter();
+                injectSeoMetaTags();
+                router();
+            } catch(e) { console.error("CMS Load Error:", e); }
         }
 
         function applyTheme() {
@@ -53,408 +61,347 @@
             document.documentElement.style.setProperty('--primary', t.primary_color || '#0f172a');
             document.documentElement.style.setProperty('--radius', (t.card_radius || 16)+'px');
             document.body.style.backgroundColor = t.body_bg || '#f8fafc';
-            document.body.style.fontSize = (t.base_font_size || 16)+'px';
-            if(t.font_family) document.body.style.fontFamily = t.font_family;
             const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
             document.getElementById('siteName').innerText = company.company_name || "WORKSMART";
             const logo = document.getElementById('siteLogo');
-            if(company.logo_url && company.logo_url.trim()) { logo.src = company.logo_url; logo.classList.remove('hidden'); }
+            if(company.logo_url) { logo.src = company.logo_url; logo.classList.remove('hidden'); }
         }
 
         function buildHierarchicalMenu() {
             const pages = (store.pages || []).filter(p => p.Status === 'published');
             const menuContainer = document.getElementById('mainMenu');
-            if (!menuContainer) return;
-            const tree = [];
-            const map = {};
-            pages.forEach(p => { map[p.ID] = { ...p, children: [] }; });
-            pages.forEach(p => {
-                if (p.ParentID && map[p.ParentID]) map[p.ParentID].children.push(map[p.ID]);
-                else tree.push(map[p.ID]);
-            });
-            function renderTree(items) {
-                let html = '';
-                items.forEach(item => {
-                    const hasChildren = item.children.length > 0;
-                    html += `<div class="relative group">
-                        <a href="#/page/${item.Slug}" class="block px-4 py-2 text-sm font-medium hover:dynamic-text">${escapeHtml(item.Title)}</a>
-                        ${hasChildren ? `<div class="absolute left-0 top-full hidden group-hover:block bg-white shadow-lg rounded-md min-w-40 z-50">${renderTree(item.children)}</div>` : ''}
+            let html = `<a href="#/" class="px-3 py-2 text-sm font-bold hover:dynamic-text">HOME</a>`;
+            
+            const roots = pages.filter(p => !p.ParentID).sort((a,b) => a.MenuOrder - b.MenuOrder);
+            roots.forEach(root => {
+                const children = pages.filter(p => p.ParentID == root.ID);
+                if(children.length > 0) {
+                    html += `
+                    <div class="relative dropdown group">
+                        <button class="flex items-center gap-1 px-3 py-2 text-sm font-bold hover:dynamic-text uppercase">
+                            ${escapeHtml(root.Title)} ▾
+                        </button>
+                        <div class="absolute left-0 top-full hidden group-hover:block bg-white border shadow-xl rounded-xl min-w-[200px] z-50">
+                            ${children.map(c => `<a href="#/page/${c.Slug}" class="block px-4 py-3 text-sm hover:bg-slate-50 border-b last:border-0">${escapeHtml(c.Title)}</a>`).join('')}
+                        </div>
                     </div>`;
-                });
-                return html;
-            }
-            let menuHtml = `<a href="#/" class="px-3 py-2 text-sm font-medium hover:dynamic-text">HOME</a>`;
-            menuHtml += renderTree(tree);
-            menuHtml += `<a href="#/products" class="px-3 py-2 text-sm font-medium hover:dynamic-text">PRODUCTS</a>`;
-            menuContainer.innerHTML = menuHtml;
-        }
-
-        function renderFooter() {
-            const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
-            const footerEl = document.getElementById('siteFooter');
-            if (footer.footer_html) { footerEl.innerHTML = footer.footer_html; return; }
-            let linksHtml = '';
-            if (footer.footer_links) {
-                try {
-                    const links = JSON.parse(footer.footer_links);
-                    linksHtml = links.map(l => `<a href="${l.url}" class="hover:dynamic-text mx-2">${escapeHtml(l.text)}</a>`).join('');
-                } catch(e) {}
-            }
-            footerEl.innerHTML = `<div class="container mx-auto px-4 text-center">${linksHtml}${linksHtml ? '<br>' : ''}<span>${escapeHtml(footer.copyright_text || '© WorkSmart CMS')}</span></div>`;
-        }
-
-        function injectSeoMetaTags() {
-            const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
-            const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
-            const hash = window.location.hash;
-            let title = seo.default_title || company.site_title || "WorkSmart";
-            let description = seo.default_description || company.company_moto || "";
-            let keywords = seo.default_keywords || "";
-            let ogImage = seo.default_og_image || "";
-            if (hash.startsWith('#/product/')) {
-                const prod = store.products.find(p => p.ID === hash.split('/')[2]);
-                if (prod) {
-                    title = prod.SEOTitle || prod.Title;
-                    description = prod.SEODesc || prod.Summary;
-                    keywords = prod.SEOKeywords || "";
-                    ogImage = prod.OGImage || prod.Thumbnail;
+                } else {
+                    html += `<a href="#/page/${root.Slug}" class="px-3 py-2 text-sm font-bold hover:dynamic-text uppercase">${escapeHtml(root.Title)}</a>`;
                 }
-            } else if (hash.startsWith('#/page/')) {
-                const page = store.pages.find(p => p.Slug === hash.split('/')[2]);
-                if (page) { title = page.Title; description = page.Content.replace(/<[^>]*>/g, '').substring(0, 160); }
-            }
-            document.title = title;
-            setMetaTag('description', description);
-            setMetaTag('keywords', keywords);
-            setMetaTag('og:title', title);
-            setMetaTag('og:description', description);
-            setMetaTag('og:image', ogImage);
-            setMetaTag('twitter:card', 'summary_large_image');
-            if (seo.twitter_handle) setMetaTag('twitter:site', seo.twitter_handle);
-        }
-        
-        function setMetaTag(name, content) {
-            if (!content) return;
-            let selector = name.startsWith('og:') ? `meta[property="${name}"]` : `meta[name="${name}"]`;
-            let meta = document.querySelector(selector);
-            if (!meta) {
-                meta = document.createElement('meta');
-                if (name.startsWith('og:')) meta.setAttribute('property', name);
-                else meta.setAttribute('name', name);
-                document.head.appendChild(meta);
-            }
-            meta.setAttribute('content', content);
+            });
+            html += `<a href="#/products" class="px-3 py-2 text-sm font-bold hover:dynamic-text">PRODUCTS</a>`;
+            menuContainer.innerHTML = html;
         }
 
+        // --- IMAGE HANDLING (FIXED FOR APPS SCRIPT) ---
         async function uploadImage(fileInput, targetFieldId) {
             if (!fileInput.files.length) return;
-            const formData = new FormData();
-            formData.append('action', 'uploadImage');
-            formData.append('file', fileInput.files[0]);
-            formData.append('filename', fileInput.files[0].name);
-            const res = await fetch(API_URL, { method: 'POST', body: formData });
-            const json = await res.json();
-            if (json.status === 'success') {
-                const targetField = document.getElementById(targetFieldId);
-                if (targetField) targetField.value = json.url;
-                else console.warn('Target field not found', targetFieldId);
-                alert('Image uploaded!');
-            } else alert('Upload failed');
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Data = e.target.result.split(',')[1];
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'uploadImage',
+                        data: { file: base64Data, filename: file.name, mimeType: file.type }
+                    })
+                });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    document.getElementById(targetFieldId).value = json.url;
+                    alert('Uploaded to Drive successfully!');
+                } else { alert('Error: ' + json.message); }
+            };
+            reader.readAsDataURL(file);
         }
 
-        function renderBlocks(blocks, container) {
-            if (!blocks.length) return;
-            for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
-                try {
-                    const settings = JSON.parse(block.Settings || '{}');
-                    if (block.Type === 'hero_image') {
-                        container.innerHTML += `
-                            <div class="relative rounded-3xl overflow-hidden mb-12">
-                                ${settings.image ? `<img src="${escapeHtml(settings.image)}" alt="${escapeHtml(settings.alt)}" class="w-full h-[500px] object-cover">` : '<div class="w-full h-[500px] bg-slate-200 flex items-center justify-center text-slate-400">Hero Image Placeholder</div>'}
-                                <div class="absolute inset-0 bg-black/40 flex flex-col justify-center items-center text-white text-center p-6">
-                                    <h1 class="text-5xl md:text-7xl font-black mb-4">${escapeHtml(settings.caption)}</h1>
-                                    <p class="text-xl max-w-2xl">${escapeHtml(settings.description)}</p>
-                                    ${settings.buttonText ? `<a href="${settings.buttonLink}" class="mt-6 inline-block bg-white text-slate-900 px-8 py-3 rounded-full font-bold">${escapeHtml(settings.buttonText)}</a>` : ''}
-                                </div>
-                            </div>
-                        `;
-                    } else if (block.Type === 'carousel') {
-                        const slides = settings.slides || [];
-                        const swiperId = `swiper-${Date.now()}`;
-                        container.innerHTML += `
-                            <div class="swiper ${swiperId} rounded-3xl mb-12 overflow-hidden">
-                                <div class="swiper-wrapper">${slides.map(slide => `<div class="swiper-slide relative"><img src="${escapeHtml(slide.image)}" alt="${escapeHtml(slide.alt)}" class="w-full h-[500px] object-cover"><div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6"><h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2><p class="text-lg mt-2">${escapeHtml(slide.description)}</p></div></div>`).join('')}</div>
-                                <div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div>
-                            </div>
-                        `;
-                        setTimeout(() => new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, autoplay: settings.autoplay ? { delay: settings.interval || 5000 } : false, loop: slides.length > 1 }), 100);
-                    } else if (block.Type === 'custom_html') {
-                        container.innerHTML += `<div class="mb-12">${settings}</div>`;
-                    }
-                } catch(e) { console.error(e); }
-            }
-        }
-
+        // --- PUBLIC VIEWS ---
         function renderHome(container) {
             const blocks = (store.contentBlocks || []).filter(b => b.Location === 'homepage').sort((a,b)=>a.Order-b.Order);
-            if (!blocks.length) { container.innerHTML = '<div class="text-center py-20">Add content blocks in Admin → Content Blocks</div>'; return; }
-            container.innerHTML = '';
-            renderBlocks(blocks, container);
+            container.innerHTML = blocks.map(b => {
+                const settings = JSON.parse(b.Settings || '{}');
+                if (b.Type === 'hero_image') {
+                    return `
+                    <div class="relative h-[500px] rounded-[var(--radius)] overflow-hidden mb-12 flex items-center justify-center text-center text-white">
+                        <img src="${settings.image || 'https://images.unsplash.com/photo-1497215728101-856f4ea42174'}" class="absolute inset-0 w-full h-full object-cover brightness-50">
+                        <div class="relative z-10 p-6 max-w-2xl">
+                            <h1 class="text-5xl md:text-7xl font-black mb-6 leading-tight">${escapeHtml(settings.caption)}</h1>
+                            <p class="text-xl mb-10 opacity-90">${escapeHtml(settings.description)}</p>
+                            <a href="${settings.buttonLink}" class="bg-white text-slate-900 px-10 py-4 rounded-full font-bold hover:scale-105 transition-transform inline-block">${escapeHtml(settings.buttonText)}</a>
+                        </div>
+                    </div>`;
+                }
+                if (b.Type === 'custom_html') return `<div class="mb-12">${settings}</div>`;
+                return '';
+            }).join('');
         }
 
         function renderProductList(container) {
-            const filtered = activeCategoryFilter === "all" ? store.products : store.products.filter(p => p.Category == activeCategoryFilter);
-            const cats = store.categories.length ? store.categories : [{ID:"general", Name:"General"}];
             container.innerHTML = `
-                <div class="flex flex-wrap gap-3 justify-center border-b pb-6 mb-8">${cats.map(c => `<button data-cat="${c.ID}" class="cat-pill px-5 py-2 rounded-full text-sm font-medium bg-slate-100 hover:dynamic-bg hover:text-white transition">${escapeHtml(c.Name.toUpperCase())}</button>`).join('')}<button data-cat="all" class="cat-pill px-5 py-2 rounded-full text-sm font-medium bg-slate-100 hover:dynamic-bg hover:text-white transition">ALL</button></div>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">${filtered.length ? filtered.map(p => `<div class="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition cursor-pointer" onclick="location.hash='#/product/${p.ID}'"><img src="${p.Thumbnail || 'https://placehold.co/600x400?text=No+Image'}" class="w-full h-56 object-cover"><div class="p-5"><div class="text-xs dynamic-text font-bold mb-1">${getCategoryName(p.Category)}</div><h3 class="text-xl font-extrabold">${escapeHtml(p.Title)}</h3><p class="text-slate-500 text-sm mt-2">${escapeHtml(p.Summary)}</p></div></div>`).join('') : '<div class="col-span-full text-center py-20">No products</div>'}</div>
-            `;
-            document.querySelectorAll('.cat-pill').forEach(btn => btn.onclick = () => { activeCategoryFilter = btn.getAttribute('data-cat'); renderProductList(container); });
+                <div class="flex flex-wrap gap-3 mb-10 items-center">
+                    <span class="text-sm font-bold text-slate-400 uppercase tracking-wider">Categories:</span>
+                    <button onclick="filterCat('all')" class="px-6 py-2 rounded-full border text-sm font-bold transition ${activeCategoryFilter==='all'?'btn-primary':'bg-white hover:bg-slate-50'}">All Products</button>
+                    ${store.categories.map(c => `
+                        <button onclick="filterCat('${c.ID}')" class="px-6 py-2 rounded-full border text-sm font-bold transition ${activeCategoryFilter==c.ID?'btn-primary':'bg-white hover:bg-slate-50'}">${escapeHtml(c.Name)}</button>
+                    `).join('')}
+                </div>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    ${store.products.filter(p => activeCategoryFilter === 'all' || p.Category == activeCategoryFilter).map(p => `
+                        <div class="bg-white rounded-[var(--radius)] overflow-hidden shadow-sm border hover:shadow-xl transition-all group cursor-pointer" onclick="location.hash='#/product/${p.ID}'">
+                            <div class="relative h-64 overflow-hidden">
+                                <img src="${p.Thumbnail || 'https://placehold.co/600x400'}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                            </div>
+                            <div class="p-6">
+                                <h3 class="text-lg font-black group-hover:dynamic-text transition-colors">${escapeHtml(p.Title)}</h3>
+                                <p class="text-slate-500 text-sm mt-2 line-clamp-2">${escapeHtml(p.Summary)}</p>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>`;
         }
 
         function renderProductDetail(container, id) {
             const p = store.products.find(x => x.ID == id);
-            if (!p) { container.innerHTML = '<div class="text-center py-20">Not found</div>'; return; }
-            const images = p.Images ? p.Images.split(',').map(i => i.trim()) : (p.Thumbnail ? [p.Thumbnail] : []);
-            const swiperId = `swiper-${Date.now()}`;
-            container.innerHTML = `<div class="max-w-6xl mx-auto"><button onclick="history.back()" class="mb-6 text-slate-400 hover:dynamic-text">← Back</button><div class="grid md:grid-cols-2 gap-10"><div class="relative rounded-2xl overflow-hidden shadow-xl"><div class="swiper ${swiperId}"><div class="swiper-wrapper">${images.map(img => `<div class="swiper-slide"><img src="${img}" class="w-full h-96 object-cover"></div>`).join('')}</div><div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div></div></div><div><h1 class="text-4xl font-black dynamic-text">${escapeHtml(p.Title)}</h1><div class="mt-6 bg-white p-5 rounded-2xl shadow-sm"><h4 class="font-bold">Tech Info</h4><div class="text-slate-600 text-sm mt-2">${escapeHtml(p.Technical_Info || 'No data')}</div></div></div></div><div class="mt-16 grid md:grid-cols-2 gap-8"><div class="bg-white p-6 rounded-2xl shadow"><h3 class="font-bold">Description</h3><div class="mt-3 text-slate-600">${escapeHtml(p.Description || '')}</div></div><div class="space-y-6">${p.Terms ? `<div class="bg-white p-6 rounded-2xl"><h3 class="font-bold">Terms</h3><div class="text-sm text-slate-500">${escapeHtml(p.Terms)}</div></div>` : ''}${p.Privacy ? `<div class="bg-white p-6 rounded-2xl"><h3 class="font-bold">Privacy</h3><div class="text-sm text-slate-500">${escapeHtml(p.Privacy)}</div></div>` : ''}</div></div></div>`;
-            setTimeout(() => new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, loop: images.length > 1 }), 50);
+            if (!p) return container.innerHTML = 'Product not found';
+            container.innerHTML = `
+                <div class="max-w-6xl mx-auto">
+                    <button onclick="history.back()" class="mb-6 flex items-center gap-2 text-slate-500 font-bold hover:text-black">← BACK TO LIST</button>
+                    <div class="grid lg:grid-cols-2 gap-12 items-start">
+                        <div class="sticky top-24">
+                            <img src="${p.Thumbnail}" class="w-full rounded-[var(--radius)] shadow-2xl">
+                        </div>
+                        <div>
+                            <span class="text-xs font-black dynamic-text tracking-[0.2em] uppercase mb-2 block">Product Details</span>
+                            <h1 class="text-5xl font-black mb-6 leading-tight">${escapeHtml(p.Title)}</h1>
+                            <p class="text-xl text-slate-600 mb-8 leading-relaxed">${escapeHtml(p.Summary)}</p>
+                            
+                            <div class="space-y-8">
+                                <div class="bg-white p-8 rounded-[var(--radius)] border shadow-sm">
+                                    <h3 class="text-sm font-black uppercase tracking-widest mb-4">Technical Specifications</h3>
+                                    <div class="text-slate-600 leading-relaxed whitespace-pre-line">${escapeHtml(p.TechInfo || 'Standard specifications apply.')}</div>
+                                </div>
+                                <div class="prose max-w-none text-slate-700">
+                                    <h3 class="text-xl font-black mb-4">Description</h3>
+                                    ${p.Description}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
         }
 
         function renderPage(container, slug) {
-            const page = store.pages.find(p => p.Slug === slug);
-            container.innerHTML = page ? `<div class="max-w-4xl mx-auto prose prose-lg">${page.Content || '<p>No content.</p>'}</div>` : '<div class="text-center py-20">Page not found</div>';
+            const p = store.pages.find(x => x.Slug === slug);
+            if (!p) return container.innerHTML = 'Page not found';
+            container.innerHTML = `
+                <article class="max-w-4xl mx-auto py-10">
+                    <h1 class="text-5xl font-black mb-10 text-center">${escapeHtml(p.Title)}</h1>
+                    <div class="bg-white p-8 md:p-12 rounded-[var(--radius)] border shadow-sm prose lg:prose-xl max-w-none">
+                        ${p.Content}
+                    </div>
+                </article>`;
         }
 
-        function getCategoryName(catId) {
-            const cat = store.categories.find(c => c.ID == catId);
-            return cat ? cat.Name : (catId === "general" ? "General" : catId);
-        }
-
-        // ======================== ADMIN PANEL ========================
+        // --- ADMIN PANEL (COMPLETE) ---
         function renderAdmin(container) {
             const token = localStorage.getItem('ws_token');
             if (!token) {
-                container.innerHTML = `<div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow mt-12"><h2 class="text-2xl font-black mb-4">Admin Login</h2><input id="admUser" class="w-full border p-3 rounded mb-3"><input id="admPass" type="password" class="w-full border p-3 rounded mb-5"><button onclick="adminLogin()" class="btn-primary w-full py-3 rounded">Login</button></div>`;
+                container.innerHTML = `
+                    <div class="max-w-md mx-auto bg-white p-10 rounded-[var(--radius)] shadow-2xl mt-20 border">
+                        <h2 class="text-3xl font-black mb-2">Admin Login</h2>
+                        <p class="text-slate-500 mb-8 text-sm font-medium">Please enter your credentials to manage the CMS.</p>
+                        <div class="space-y-4">
+                            <input id="admUser" placeholder="Username" class="w-full border p-4 rounded-2xl outline-none focus:border-black transition">
+                            <input id="admPass" type="password" placeholder="Password" class="w-full border p-4 rounded-2xl outline-none focus:border-black transition">
+                            <button onclick="adminLogin()" class="btn-primary w-full py-4 font-black text-lg shadow-lg hover:opacity-90 transition">SIGN IN</button>
+                        </div>
+                    </div>`;
                 return;
             }
-            container.innerHTML = `<div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-black">Admin Console</h1><button onclick="adminLogout()" class="text-red-500 border px-4 py-1 rounded-full">Logout</button></div><div class="flex flex-wrap gap-2 border-b mb-6"><button data-tab="site" class="tab-btn px-4 py-2">Site & Theme</button><button data-tab="blocks" class="tab-btn px-4 py-2">Content Blocks</button><button data-tab="pages" class="tab-btn px-4 py-2">Pages</button><button data-tab="products" class="tab-btn px-4 py-2">Products</button><button data-tab="seo" class="tab-btn px-4 py-2">SEO</button><button data-tab="footer" class="tab-btn px-4 py-2">Footer</button></div><div id="tabContent"></div>`;
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.onclick = () => loadTab(btn.innerText.toLowerCase().includes('site')?'site':btn.innerText.toLowerCase().includes('blocks')?'blocks':btn.innerText.toLowerCase().includes('pages')?'pages':btn.innerText.toLowerCase().includes('products')?'products':btn.innerText.toLowerCase().includes('seo')?'seo':'footer'));
-            loadTab('site');
+
+            container.innerHTML = `
+                <div class="bg-white rounded-[var(--radius)] shadow-sm border p-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
+                        <div>
+                            <h1 class="text-3xl font-black">CMS Dashboard</h1>
+                            <p class="text-slate-500 font-medium">Manage your website content and settings</p>
+                        </div>
+                        <button onclick="localStorage.removeItem('ws_token'); location.reload();" class="text-red-500 font-bold px-6 py-2 border border-red-100 rounded-full hover:bg-red-50 transition">LOGOUT SESSION</button>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        <button onclick="openProductModal()" class="bg-slate-50 p-8 rounded-3xl border border-transparent hover:border-black hover:bg-white transition text-left group">
+                            <span class="text-3xl block mb-2">📦</span>
+                            <span class="font-black text-lg block group-hover:dynamic-text">Products</span>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">${store.products.length} Items</span>
+                        </button>
+                        <button onclick="openCategoryModal()" class="bg-slate-50 p-8 rounded-3xl border border-transparent hover:border-black hover:bg-white transition text-left group">
+                            <span class="text-3xl block mb-2">📁</span>
+                            <span class="font-black text-lg block group-hover:dynamic-text">Categories</span>
+                            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">${store.categories.length} Groups</span>
+                        </button>
+                    </div>
+                </div>`;
         }
 
-        async function loadTab(tab) {
-            const div = document.getElementById('tabContent');
-            if (!div) return;
-            if (tab === 'site') {
-                const theme = Object.fromEntries((store.theme || []).map(i=>[i.Key,i.Value]));
-                const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `
-                    <div class="bg-white p-6 rounded-2xl shadow space-y-4"><h3 class="font-black">Theme</h3><div class="grid md:grid-cols-2 gap-3"><label>Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color||'#0f172a'}"><label>Body BG</label><input type="color" id="body_bg" value="${theme.body_bg||'#f8fafc'}"><label>Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius||16}"><label>Base Font (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size||16}"><label>Font Family</label><input id="font_family" value="${theme.font_family||'Inter'}" class="border p-2 rounded"></div><button onclick="saveTheme()" class="btn-primary px-4 py-2 rounded mt-4">Save Theme</button></div>
-                    <div class="bg-white p-6 rounded-2xl shadow mt-6"><h3 class="font-black">Company Info</h3><div class="space-y-3"><div><label>Site Title</label><input id="comp_site_title" value="${escapeHtml(company.site_title||'')}" class="w-full border p-2 rounded"></div><div><label>Company Name</label><input id="comp_company_name" value="${escapeHtml(company.company_name||'')}" class="w-full border p-2 rounded"></div><div><label>Company Moto</label><input id="comp_company_moto" value="${escapeHtml(company.company_moto||'')}" class="w-full border p-2 rounded"></div><div><label>Logo</label><div class="flex gap-2"><input type="file" id="logoUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('logoUpload'),'comp_logo_url')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="comp_logo_url" value="${escapeHtml(company.logo_url||'')}" class="w-full border p-2 rounded mt-2" placeholder="Logo URL will appear here"></div></div><button onclick="saveCompanyInfo()" class="btn-primary px-4 py-2 rounded mt-4">Save Company</button></div>
-                `;
-            } else if (tab === 'blocks') {
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="blocksList"></div><button onclick="openBlockModal()" class="btn-primary px-4 py-2 rounded mt-4">+ Add Block</button></div>`;
-                renderBlocksList();
-            } else if (tab === 'pages') {
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="pagesList"></div><button onclick="openPageModal()" class="btn-primary px-4 py-2 rounded mt-4">+ New Page</button></div>`;
-                renderPagesList();
-            } else if (tab === 'products') {
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><button onclick="openProductModal()" class="bg-emerald-600 text-white px-4 py-2 rounded mb-4">+ New Product</button><div id="productsTable"></div></div>`;
-                renderProductsTable();
-            } else if (tab === 'seo') {
-                const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><div><label>Default OG Image</label><div class="flex gap-2"><input type="file" id="ogImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('ogImageUpload'),'seo_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="seo_ogimage" value="${seo.default_og_image||''}" class="w-full border p-2 rounded mt-2"></div><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded">Save SEO</button></div>`;
-            } else if (tab === 'footer') {
-                const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Footer Settings</h3><input id="footer_copyright" placeholder="Copyright Text" value="${escapeHtml(footer.copyright_text||'')}" class="w-full border p-2 rounded"><textarea id="footer_links" placeholder='Links JSON: [{"text":"Home","url":"/"}]' rows="3" class="w-full border p-2 rounded">${escapeHtml(footer.footer_links||'[]')}</textarea><textarea id="footer_html" placeholder="Custom HTML (overrides above)" rows="4" class="w-full border p-2 rounded">${escapeHtml(footer.footer_html||'')}</textarea><button onclick="saveFooter()" class="btn-primary px-4 py-2 rounded">Save Footer</button></div>`;
-            }
-        }
-
-        function renderBlocksList() {
-            const container = document.getElementById('blocksList');
-            if (!container) return;
-            container.innerHTML = (store.contentBlocks || []).map(b => `<div class="border-b py-3 flex justify-between items-center"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type})<br><div class="text-xs text-slate-500">Order: ${b.Order} | Location: ${b.Location}</div></div><div><button onclick="editBlock('${b.BlockID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteBlock('${b.BlockID}')" class="text-red-500">Delete</button></div></div>`).join('');
-        }
-
-        function renderPagesList() {
-            const container = document.getElementById('pagesList');
-            if (!container) return;
-            container.innerHTML = (store.pages || []).map(p => `<div class="border-b py-3 flex justify-between"><div><b>${escapeHtml(p.Title)}</b> /${p.Slug} ${p.ParentID ? '(child)' : ''}</div><div><button onclick="editPage('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deletePageItem('${p.ID}')" class="text-red-500">Delete</button></div></div>`).join('');
-        }
-
-        function renderProductsTable() {
-            const container = document.getElementById('productsTable');
-            if (!container) return;
-            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModal('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></table>`;
-        }
-
-        // CRUD functions
-        window.adminLogin = async () => {
-            const res = await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'login', data:{ username:document.getElementById('admUser').value, password:document.getElementById('admPass').value } }) });
+        async function adminLogin() {
+            const u = document.getElementById('admUser').value;
+            const p = document.getElementById('admPass').value;
+            const res = await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'login', data:{ username:u, password:p } }) });
             const json = await res.json();
-            if (json.status === 'success') { localStorage.setItem('ws_token', json.token); router(); } else alert('Invalid');
-        };
-        window.adminLogout = () => { localStorage.removeItem('ws_token'); router(); };
-        window.saveTheme = async () => {
-            const data = { primary_color: document.getElementById('primary_color')?.value, body_bg: document.getElementById('body_bg')?.value, card_radius: document.getElementById('card_radius')?.value, base_font_size: document.getElementById('base_font_size')?.value, font_family: document.getElementById('font_family')?.value };
-            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateTheme', data }) });
-            location.reload();
-        };
-        window.saveCompanyInfo = async () => {
-            const data = { site_title: document.getElementById('comp_site_title')?.value, company_name: document.getElementById('comp_company_name')?.value, company_moto: document.getElementById('comp_company_moto')?.value, logo_url: document.getElementById('comp_logo_url')?.value };
-            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSettings', data }) });
-            location.reload();
-        };
-        window.saveSeo = async () => {
-            const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_keywords: document.getElementById('seo_keywords')?.value, default_og_image: document.getElementById('seo_ogimage')?.value, twitter_handle: document.getElementById('seo_twitter')?.value };
-            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSeoDefaults', data }) });
-            location.reload();
-        };
-        window.saveFooter = async () => {
-            const data = { copyright_text: document.getElementById('footer_copyright')?.value, footer_links: document.getElementById('footer_links')?.value, footer_html: document.getElementById('footer_html')?.value };
-            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateFooter', data }) });
-            location.reload();
-        };
+            if (json.status === 'success') { localStorage.setItem('ws_token', json.token); router(); } else { alert('Access Denied'); }
+        }
 
-        // Block modals (simplified, with image upload only)
-        window.openBlockModal = (id=null) => {
-            const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'hero_image', Settings:'{}', Order:0, Location:'homepage' };
-            let settings = {};
-            try { settings = JSON.parse(block.Settings); } catch(e) {}
+        // --- MODALS ---
+        window.openProductModal = () => {
             const modal = document.createElement('div');
-            modal.id = 'blockModal';
-            modal.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
-            modal.innerHTML = `<div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer"></div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
-            document.body.appendChild(modal);
-            const renderSettings = () => {
-                const type = document.getElementById('block_type').value;
-                const container = document.getElementById('settingsContainer');
-                if (type === 'hero_image') {
-                    container.innerHTML = `<div class="flex gap-2 mb-2"><input type="file" id="heroImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('heroImageUpload'),'hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="hero_image" placeholder="Image URL (auto-filled)" value="${escapeHtml(settings.image||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_caption" placeholder="Caption" value="${escapeHtml(settings.caption||'')}" class="w-full border p-2 rounded mb-2"><textarea id="hero_desc" placeholder="Description" class="w-full border p-2 rounded mb-2">${escapeHtml(settings.description||'')}</textarea><input id="hero_alt" placeholder="Alt Text" value="${escapeHtml(settings.alt||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_btn_text" placeholder="Button Text" value="${escapeHtml(settings.buttonText||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_btn_link" placeholder="Button Link" value="${escapeHtml(settings.buttonLink||'#/products')}" class="w-full border p-2 rounded">`;
-                } else if (type === 'carousel') {
-                    const slides = settings.slides || [];
-                    container.innerHTML = `<label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${settings.autoplay?'selected':''}>Yes</option><option value="false" ${!settings.autoplay?'selected':''}>No</option></select><label>Interval (ms)</label><input id="carousel_interval" type="number" value="${settings.interval||5000}" class="w-full border p-2 rounded mb-4"><div id="carouselSlidesList"></div><button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>`;
-                    const renderSlides = () => {
-                        const list = document.getElementById('carouselSlidesList');
-                        if (!list) return;
-                        list.innerHTML = '';
-                        slides.forEach((slide, idx) => {
-                            const div = document.createElement('div');
-                            div.className = 'border p-3 rounded mb-2';
-                            div.innerHTML = `<h4>Slide ${idx+1}</h4><div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this, ${idx})" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div><input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea><input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
-                            list.appendChild(div);
-                        });
-                    };
-                    window.uploadSlideImage = (btn, idx) => {
-                        const fileInput = btn.previousElementSibling;
-                        if (!fileInput.files.length) return;
-                        const formData = new FormData();
-                        formData.append('action', 'uploadImage');
-                        formData.append('file', fileInput.files[0]);
-                        fetch(API_URL, { method:'POST', body:formData }).then(r=>r.json()).then(json=>{ if(json.status==='success') btn.closest('.border').querySelector('.slide-image').value = json.url; });
-                    };
-                    window.addCarouselSlide = () => {
-                        const list = document.getElementById('carouselSlidesList');
-                        const div = document.createElement('div');
-                        div.className = 'border p-3 rounded mb-2';
-                        div.innerHTML = `<h4>Slide ${list.children.length+1}</h4><div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this, null)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div><input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea><input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
-                        list.appendChild(div);
-                    };
-                    renderSlides();
-                } else {
-                    container.innerHTML = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded">${escapeHtml(block.Settings)}</textarea>`;
-                }
-            };
-            renderSettings();
-            window.submitBlock = async () => {
-                const type = document.getElementById('block_type').value;
-                let settings = {};
-                if (type === 'hero_image') {
-                    settings = { image: document.getElementById('hero_image')?.value, caption: document.getElementById('hero_caption')?.value, description: document.getElementById('hero_desc')?.value, alt: document.getElementById('hero_alt')?.value, buttonText: document.getElementById('hero_btn_text')?.value, buttonLink: document.getElementById('hero_btn_link')?.value };
-                } else if (type === 'carousel') {
-                    const slides = [];
-                    document.querySelectorAll('#carouselSlidesList > div').forEach(div => {
-                        const image = div.querySelector('.slide-image')?.value;
-                        if (image) slides.push({ image, caption: div.querySelector('.slide-caption')?.value, description: div.querySelector('.slide-desc')?.value, alt: div.querySelector('.slide-alt')?.value });
-                    });
-                    settings = { autoplay: document.getElementById('carousel_autoplay')?.value === 'true', interval: parseInt(document.getElementById('carousel_interval')?.value) || 5000, slides };
-                } else {
-                    settings = document.getElementById('custom_html')?.value;
-                }
-                const data = { id: document.getElementById('block_id').value, blockName: document.getElementById('block_name').value, type: type, settings: JSON.stringify(settings), order: document.getElementById('block_order').value, location: document.getElementById('block_location').value };
-                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
-                location.reload();
-            };
-        };
-        window.editBlock = (id) => openBlockModal(id);
-        window.deleteBlock = async (id) => { if(confirm('Delete?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
+            modal.id = "pModal";
+            modal.className = "fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4";
+            modal.innerHTML = `
+                <div class="bg-white w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[var(--radius)] p-8 shadow-2xl relative">
+                    <button onclick="this.closest('#pModal').remove()" class="absolute top-6 right-6 text-2xl font-bold">✕</button>
+                    <h2 class="text-3xl font-black mb-8">Product Manager</h2>
+                    
+                    <div class="space-y-4 mb-10">
+                        ${store.products.map(p => `
+                            <div class="flex items-center justify-between p-4 border rounded-2xl bg-slate-50">
+                                <div class="flex items-center gap-4">
+                                    <img src="${p.Thumbnail}" class="w-12 h-12 rounded-lg object-cover">
+                                    <span class="font-black">${escapeHtml(p.Title)}</span>
+                                </div>
+                                <button onclick="deleteProductItem('${p.ID}')" class="text-red-500 font-bold hover:underline">Delete</button>
+                            </div>
+                        `).join('')}
+                    </div>
 
-        // Pages
-        window.openPageModal = (id=null) => {
-            const page = id ? store.pages.find(p => p.ID == id) : { ID:'', Slug:'', Title:'', Content:'', MenuOrder:0, Status:'published', ParentID:'' };
-            const parentOptions = '<option value="">None (Root)</option>' + (store.pages || []).filter(p => p.ID !== page.ID).map(p => `<option value="${p.ID}" ${page.ParentID===p.ID?'selected':''}>${escapeHtml(p.Title)}</option>`).join('');
+                    <div class="bg-slate-50 p-8 rounded-3xl border-2 border-dashed border-slate-200">
+                        <h3 class="text-xl font-black mb-6 uppercase tracking-wider">Add New Product</h3>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="space-y-4">
+                                <label class="block text-xs font-black uppercase">Title</label>
+                                <input id="p_title" class="w-full border p-4 rounded-xl">
+                                
+                                <label class="block text-xs font-black uppercase">Category</label>
+                                <select id="p_cat" class="w-full border p-4 rounded-xl">
+                                    ${store.categories.map(c => `<option value="${c.ID}">${c.Name}</option>`).join('')}
+                                </select>
+                                
+                                <label class="block text-xs font-black uppercase">Thumbnail URL</label>
+                                <div class="flex gap-2">
+                                    <input id="p_thumb" class="flex-1 border p-4 rounded-xl text-xs">
+                                    <input type="file" onchange="uploadImage(this, 'p_thumb')" class="hidden" id="f_thumb">
+                                    <button onclick="document.getElementById('f_thumb').click()" class="bg-black text-white px-4 rounded-xl text-xs font-bold uppercase">Upload</button>
+                                </div>
+                            </div>
+                            <div class="space-y-4">
+                                <label class="block text-xs font-black uppercase">Short Summary</label>
+                                <textarea id="p_summary" class="w-full border p-4 rounded-xl h-24"></textarea>
+                                
+                                <label class="block text-xs font-black uppercase">Technical Info</label>
+                                <textarea id="p_tech" class="w-full border p-4 rounded-xl h-24"></textarea>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-xs font-black uppercase mb-2">Detailed Description (HTML allowed)</label>
+                                <textarea id="p_desc" class="w-full border p-4 rounded-xl h-40"></textarea>
+                            </div>
+                        </div>
+                        <button onclick="saveNewProduct()" class="btn-primary w-full py-5 mt-8 font-black text-xl tracking-widest uppercase">Save Product to Database</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+        };
+
+        window.saveNewProduct = async () => {
+            const data = {
+                title: document.getElementById('p_title').value,
+                catId: document.getElementById('p_cat').value,
+                thumb: document.getElementById('p_thumb').value,
+                summary: document.getElementById('p_summary').value,
+                tech: document.getElementById('p_tech').value,
+                desc: document.getElementById('p_desc').value,
+                id: "" // Empty ID tells backend to create new
+            };
+            if(!data.title) return alert('Title is required');
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveProduct', data }) });
+            location.reload();
+        };
+
+        window.deleteProductItem = async (id) => {
+            if(confirm('Permanently delete this product?')) {
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) });
+                location.reload();
+            }
+        };
+
+        window.openCategoryModal = () => {
             const modal = document.createElement('div');
-            modal.id = 'pageModal';
-            modal.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4';
-            modal.innerHTML = `<div class="bg-white w-full max-w-3xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Page' : 'New Page'}</h3><input type="hidden" id="page_id" value="${page.ID}"><input id="page_title" placeholder="Title" value="${escapeHtml(page.Title)}" class="w-full border p-3 rounded mb-3"><input id="page_slug" placeholder="Slug" value="${escapeHtml(page.Slug)}" class="w-full border p-3 rounded mb-3"><select id="page_parent" class="w-full border p-3 rounded mb-3">${parentOptions}</select><input id="page_order" type="number" placeholder="Menu Order" value="${page.MenuOrder}" class="w-full border p-3 rounded mb-3"><select id="page_status" class="w-full border p-3 rounded mb-3"><option value="published" ${page.Status==='published'?'selected':''}>Published</option><option value="draft" ${page.Status==='draft'?'selected':''}>Draft</option></select><textarea id="page_content" rows="8" class="w-full border p-3 rounded mb-4" placeholder="HTML content">${escapeHtml(page.Content)}</textarea><div class="flex gap-3"><button onclick="submitPage()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('pageModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
+            modal.id = "cModal";
+            modal.className = "fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4";
+            modal.innerHTML = `
+                <div class="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl relative">
+                    <button onclick="this.closest('#cModal').remove()" class="absolute top-4 right-4 text-xl">✕</button>
+                    <h2 class="text-2xl font-black mb-6">Manage Categories</h2>
+                    <div class="space-y-3 mb-8">
+                        ${store.categories.map(c => `
+                            <div class="flex justify-between items-center p-3 border rounded-xl bg-slate-50">
+                                <span class="font-bold">${escapeHtml(c.Name)}</span>
+                                <button onclick="deleteCategoryItem('${c.ID}')" class="text-red-500 text-xs font-bold uppercase">Delete</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <input id="new_c_name" placeholder="Category Name" class="w-full border p-4 rounded-xl mb-4">
+                    <button onclick="saveCategory()" class="btn-primary w-full py-4 font-bold uppercase">Add Category</button>
+                </div>`;
             document.body.appendChild(modal);
-            window.submitPage = async () => {
-                const data = { id: document.getElementById('page_id').value, title: document.getElementById('page_title').value, slug: document.getElementById('page_slug').value, parentId: document.getElementById('page_parent').value, menuOrder: document.getElementById('page_order').value, status: document.getElementById('page_status').value, content: document.getElementById('page_content').value };
-                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'savePage', data }) });
-                location.reload();
-            };
         };
-        window.editPage = (id) => openPageModal(id);
-        window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
 
-        // Products (simplified, with image upload only)
-        window.openProductModal = (id=null) => {
-            const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
-            const catOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category===c.ID?'selected':''}>${escapeHtml(c.Name)}</option>`).join('');
-            const modal = document.createElement('div');
-            modal.id = 'productModal';
-            modal.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
-            modal.innerHTML = `<div class="bg-white w-full max-w-5xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Product' : 'New Product'}</h3><input type="hidden" id="prod_id" value="${prod.ID}"><div class="grid md:grid-cols-2 gap-4"><div><label>Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border p-2 rounded mb-2"><label>Category</label><select id="prod_cat" class="w-full border p-2 rounded mb-2">${catOptions}</select><label>Thumbnail</label><div class="flex gap-2 mb-2"><input type="file" id="thumbUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('thumbUpload'),'prod_thumb')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="prod_thumb" value="${escapeHtml(prod.Thumbnail)}" class="w-full border p-2 rounded mb-2"><label>Images (comma URLs)</label><textarea id="prod_images" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Images)}</textarea><div class="flex gap-2 mb-2"><input type="file" id="multiImagesUpload" accept="image/*" multiple><button onclick="uploadMultipleImages()" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload Multiple</button></div><label>Summary</label><textarea id="prod_summary" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Summary)}</textarea><label>Description</label><textarea id="prod_desc" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Description)}</textarea></div><div><label>Technical Info</label><textarea id="prod_tech" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Technical_Info)}</textarea><label>Terms</label><textarea id="prod_terms" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Terms)}</textarea><label>Privacy</label><textarea id="prod_privacy" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Privacy)}</textarea><label>Service Commitment</label><textarea id="prod_service" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.ServiceCommitment)}</textarea><hr class="my-2"><label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle)}" class="w-full border p-2 rounded mb-2"><label>SEO Description</label><textarea id="prod_seod" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.SEODesc)}</textarea><label>SEO Keywords</label><input id="prod_seok" value="${escapeHtml(prod.SEOKeywords)}" class="w-full border p-2 rounded mb-2"><label>OG Title</label><input id="prod_ogtitle" value="${escapeHtml(prod.OGTitle)}" class="w-full border p-2 rounded mb-2"><label>OG Description</label><textarea id="prod_ogdesc" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.OGDesc)}</textarea><label>OG Image</label><div class="flex gap-2 mb-2"><input type="file" id="ogImageUploadProd" accept="image/*"><button onclick="uploadImage(document.getElementById('ogImageUploadProd'),'prod_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="prod_ogimage" value="${escapeHtml(prod.OGImage)}" class="w-full border p-2 rounded mb-2"><label>Twitter Card</label><input id="prod_twcard" value="${escapeHtml(prod.TwitterCard)}" class="w-full border p-2 rounded mb-2"></div></div><div class="flex gap-3 mt-6"><button onclick="submitProduct()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('productModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
-            document.body.appendChild(modal);
-            window.uploadMultipleImages = async () => {
-                const files = document.getElementById('multiImagesUpload').files;
-                const current = document.getElementById('prod_images').value;
-                const urls = current ? current.split(',').map(u=>u.trim()) : [];
-                for (let file of files) {
-                    const fd = new FormData();
-                    fd.append('action', 'uploadImage');
-                    fd.append('file', file);
-                    const res = await fetch(API_URL, { method:'POST', body:fd });
-                    const json = await res.json();
-                    if (json.status === 'success') urls.push(json.url);
-                }
-                document.getElementById('prod_images').value = urls.join(',');
-                alert('Uploaded');
-            };
-            window.submitProduct = async () => {
-                const data = { id: document.getElementById('prod_id').value, catId: document.getElementById('prod_cat').value, title: document.getElementById('prod_title').value, thumb: document.getElementById('prod_thumb').value, imgs: document.getElementById('prod_images').value, summary: document.getElementById('prod_summary').value, desc: document.getElementById('prod_desc').value, tech: document.getElementById('prod_tech').value, terms: document.getElementById('prod_terms').value, privacy: document.getElementById('prod_privacy').value, serviceCommitment: document.getElementById('prod_service').value, seoT: document.getElementById('prod_seot').value, seoD: document.getElementById('prod_seod').value, seoK: document.getElementById('prod_seok').value, ogTitle: document.getElementById('prod_ogtitle').value, ogDesc: document.getElementById('prod_ogdesc').value, ogImage: document.getElementById('prod_ogimage').value, twCard: document.getElementById('prod_twcard').value };
-                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveProduct', data }) });
-                location.reload();
-            };
+        window.saveCategory = async () => {
+            const name = document.getElementById('new_c_name').value;
+            if(!name) return;
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveCategory', data:{ name } }) });
+            location.reload();
         };
-        window.deleteProductItem = async (id) => { if(confirm('Delete?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
 
-        window.closeModal = (id) => { const el = document.getElementById(id); if (el) el.remove(); };
-        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+        window.deleteCategoryItem = async (id) => {
+            if(confirm('Delete category?')) {
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) });
+                location.reload();
+            }
+        };
 
-        window.addEventListener('hashchange', () => { injectSeoMetaTags(); router(); });
-        window.addEventListener('load', fetchData);
+        // --- UTILS & ROUTING ---
+        window.filterCat = (id) => { activeCategoryFilter = id; renderProductList(document.getElementById('app')); };
+        function escapeHtml(str) { if (!str) return ''; return str.toString().replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+        
+        function renderFooter() {
+            const f = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
+            document.getElementById('siteFooter').innerHTML = `
+                <div class="container mx-auto px-4 text-center">
+                    <p class="font-black text-lg mb-4 uppercase tracking-[0.3em]">${document.getElementById('siteName').innerText}</p>
+                    <p class="text-slate-400 font-medium text-sm">${escapeHtml(f.copyright_text || '© 2025 ALL RIGHTS RESERVED')}</p>
+                </div>`;
+        }
+
+        function injectSeoMetaTags() {
+            const s = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
+            document.title = s.default_title || "WorkSmart CMS";
+        }
+
         async function router() {
             const hash = location.hash || '#/';
             const app = document.getElementById('app');
+            app.innerHTML = '<div class="flex justify-center py-20"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-black"></div></div>';
+            
             if (hash === '#/') renderHome(app);
             else if (hash === '#/products') renderProductList(app);
             else if (hash.startsWith('#/product/')) renderProductDetail(app, hash.split('/')[2]);
             else if (hash.startsWith('#/page/')) renderPage(app, hash.split('/')[2]);
-            else if (hash === '#/admin-as') renderAdmin(app);
-            else renderHome(app);
+            else if (hash === '#/admin') renderAdmin(app);
         }
+
+        window.addEventListener('hashchange', router);
+        window.addEventListener('load', fetchData);
     </script>
 </body>
 </html>
