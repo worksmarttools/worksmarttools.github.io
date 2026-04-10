@@ -51,7 +51,6 @@
                 // Fix: map ContentBlocks correctly (sheet uses "Content" column, not "Settings")
                 if (store.contentBlocks) {
                     store.contentBlocks = store.contentBlocks.map(block => {
-                        // If the block has a "Content" field, rename it to "Settings" for internal use
                         if (block.Content !== undefined && block.Settings === undefined) {
                             block.Settings = block.Content;
                         }
@@ -152,15 +151,18 @@
             reader.readAsDataURL(file);
         }
 
-        // ======================== BLOCK RENDERING (HOME) ========================
+        // ======================== BLOCK RENDERING (HOME) - FIXED JSON PARSING ========================
         function renderBlocks(blocks, container) {
             for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
                 try {
                     let settings = {};
-                    if (typeof block.Settings === 'string') {
-                        settings = JSON.parse(block.Settings);
-                    } else {
-                        settings = block.Settings || {};
+                    // Safe JSON parsing
+                    if (block.Settings) {
+                        if (typeof block.Settings === 'string') {
+                            settings = JSON.parse(block.Settings);
+                        } else {
+                            settings = block.Settings;
+                        }
                     }
                     if (block.Type === 'hero_image') {
                         const imageUrl = settings.image && settings.image.trim() !== '' ? settings.image : 'https://images.unsplash.com/photo-1497215728101-856f4ea42174';
@@ -289,7 +291,7 @@
         function renderProductsTable() {
             const container = document.getElementById('productsTable');
             if (!container) return;
-            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th><tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></table>`;
+            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></div>`;
         }
 
         function renderCategoriesList() {
@@ -301,18 +303,71 @@
         // ======================== CRUD HELPERS ========================
         function getCategoryName(catId) { const c = store.categories.find(c => c.ID == catId); return c ? c.Name : (catId === "general" ? "General" : catId); }
 
-        window.adminLogin = async () => { const res = await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'login', data:{ username:document.getElementById('admUser').value, password:document.getElementById('admPass').value } }) }); const json = await res.json(); if(json.status==='success') { localStorage.setItem('ws_token',json.token); router(); } else alert('Invalid'); };
-        window.saveTheme = async () => { const data = { primary_color: document.getElementById('primary_color')?.value, body_bg: document.getElementById('body_bg')?.value, card_radius: document.getElementById('card_radius')?.value, base_font_size: document.getElementById('base_font_size')?.value, font_family: document.getElementById('font_family')?.value }; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateTheme', data }) }); location.reload(); };
-        window.saveCompany = async () => { const data = { site_title: document.getElementById('comp_site_title')?.value, company_name: document.getElementById('comp_company_name')?.value, company_moto: document.getElementById('comp_company_moto')?.value, logo_url: document.getElementById('comp_logo_url')?.value }; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSettings', data }) }); location.reload(); };
-        window.saveSeo = async () => { const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_keywords: document.getElementById('seo_keywords')?.value, default_og_image: document.getElementById('seo_ogimage')?.value, twitter_handle: document.getElementById('seo_twitter')?.value }; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSeoDefaults', data }) }); location.reload(); };
-        window.saveFooter = async () => { const data = { copyright_text: document.getElementById('footer_copyright')?.value, footer_links: document.getElementById('footer_links')?.value, footer_html: document.getElementById('footer_html')?.value }; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateFooter', data }) }); location.reload(); };
-        window.addCategory = async () => { const name = document.getElementById('newCatName')?.value; if(!name) return; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveCategory', data:{ name } }) }); location.reload(); };
+        window.adminLogin = async () => { 
+            const res = await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'login', data:{ username:document.getElementById('admUser').value, password:document.getElementById('admPass').value } }) }); 
+            const json = await res.json(); 
+            if(json.status==='success') { localStorage.setItem('ws_token',json.token); router(); } else alert('Invalid'); 
+        };
         
-        // GLOBAL DELETE FUNCTIONS - FIXED (exposed to window)
-        window.deleteProductItem = async (id) => { if(confirm('Permanently delete this product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
-        window.deletePageItem = async (id) => { if(confirm('Permanently delete this page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
-        window.deleteBlock = async (id) => { if(confirm('Permanently delete this content block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
-        window.deleteCategoryItem = async (id) => { if(confirm('Permanently delete this category?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); location.reload(); } };
+        window.saveTheme = async () => { 
+            const data = { primary_color: document.getElementById('primary_color')?.value, body_bg: document.getElementById('body_bg')?.value, card_radius: document.getElementById('card_radius')?.value, base_font_size: document.getElementById('base_font_size')?.value, font_family: document.getElementById('font_family')?.value }; 
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateTheme', data }) }); 
+            fetchData(); 
+        };
+        
+        window.saveCompany = async () => { 
+            const data = { site_title: document.getElementById('comp_site_title')?.value, company_name: document.getElementById('comp_company_name')?.value, company_moto: document.getElementById('comp_company_moto')?.value, logo_url: document.getElementById('comp_logo_url')?.value }; 
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSettings', data }) }); 
+            fetchData(); 
+        };
+        
+        window.saveSeo = async () => { 
+            const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_keywords: document.getElementById('seo_keywords')?.value, default_og_image: document.getElementById('seo_ogimage')?.value, twitter_handle: document.getElementById('seo_twitter')?.value }; 
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSeoDefaults', data }) }); 
+            fetchData(); 
+        };
+        
+        window.saveFooter = async () => { 
+            const data = { copyright_text: document.getElementById('footer_copyright')?.value, footer_links: document.getElementById('footer_links')?.value, footer_html: document.getElementById('footer_html')?.value }; 
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateFooter', data }) }); 
+            fetchData(); 
+        };
+        
+        window.addCategory = async () => { 
+            const name = document.getElementById('newCatName')?.value; 
+            if(!name) return; 
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveCategory', data:{ name } }) }); 
+            fetchData(); 
+        };
+        
+        // ======================== GLOBAL DELETE FUNCTIONS (FIXED) ========================
+        window.deleteProductItem = async (id) => { 
+            if(confirm('Permanently delete this product?')) { 
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); 
+                fetchData(); 
+            } 
+        };
+        
+        window.deletePageItem = async (id) => { 
+            if(confirm('Permanently delete this page?')) { 
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); 
+                fetchData(); 
+            } 
+        };
+        
+        window.deleteBlock = async (id) => { 
+            if(confirm('Permanently delete this content block?')) { 
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); 
+                fetchData(); 
+            } 
+        };
+        
+        window.deleteCategoryItem = async (id) => { 
+            if(confirm('Permanently delete this category?')) { 
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); 
+                fetchData(); 
+            } 
+        };
 
         // ======================== PRODUCT MODAL ========================
         window.openProductModal = () => openProductModalEdit(null);
@@ -325,7 +380,7 @@
             window.submitProduct = async () => {
                 const data = { id: document.getElementById('prod_id').value, catId: document.getElementById('prod_cat').value, title: document.getElementById('prod_title').value, thumb: document.getElementById('prod_thumb').value, imgs: document.getElementById('prod_images').value, summary: document.getElementById('prod_summary').value, desc: document.getElementById('prod_desc').value, tech: document.getElementById('prod_tech').value, terms: document.getElementById('prod_terms').value, privacy: document.getElementById('prod_privacy').value, serviceCommitment: document.getElementById('prod_service').value, seoT: document.getElementById('prod_seot').value, seoD: document.getElementById('prod_seod').value, seoK: document.getElementById('prod_seok').value, ogTitle: document.getElementById('prod_ogtitle').value, ogDesc: document.getElementById('prod_ogdesc').value, ogImage: document.getElementById('prod_ogimage').value, twCard: document.getElementById('prod_twcard').value };
                 await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveProduct', data }) });
-                location.reload();
+                fetchData();
             };
         };
 
@@ -419,7 +474,7 @@
                 }
                 const data = { id: document.getElementById('block_id').value, blockName: document.getElementById('block_name').value, type: type, settings: JSON.stringify(settings), order: document.getElementById('block_order').value, location: document.getElementById('block_location').value };
                 await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
-                location.reload();
+                fetchData();
             };
         };
         window.editBlock = (id) => openBlockModal(id);
@@ -434,7 +489,7 @@
             window.submitPage = async () => {
                 const data = { id: document.getElementById('page_id').value, title: document.getElementById('page_title').value, slug: document.getElementById('page_slug').value, parentId: document.getElementById('page_parent').value, menuOrder: document.getElementById('page_order').value, status: document.getElementById('page_status').value, content: document.getElementById('page_content').value };
                 await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'savePage', data }) });
-                location.reload();
+                fetchData();
             };
         };
         window.editPage = (id) => openPageModal(id);
