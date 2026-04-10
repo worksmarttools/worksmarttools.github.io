@@ -2,158 +2,94 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WorkSmart Tools | Intelligent CMS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>WorkSmart CMS | Ultimate Control</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
-        :root { --p-color: #0f172a; }
-        .dynamic-bg { background-color: var(--p-color); transition: all 0.2s ease; }
-        .dynamic-text { color: var(--p-color); }
-        .glass-panel { background: rgba(255,255,255,0.85); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.5); }
-        .card-hover { transition: all 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1); }
-        .card-hover:hover { transform: translateY(-8px) scale(1.01); box-shadow: 0 25px 40px -12px rgba(0,0,0,0.2); }
-        .category-pill.active { background: var(--p-color) !important; color: white !important; }
-        .animate-fade-in { animation: fadeIn 0.6s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        :root { --primary: #0f172a; --radius: 1rem; --bg: #f8fafc; }
+        body { background: var(--bg); font-family: 'Inter', sans-serif; }
+        .card { border-radius: var(--radius); transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; border-radius: var(--radius); transition: opacity 0.2s; }
+        .btn-primary:hover { opacity: 0.9; }
+        .dynamic-bg { background: var(--primary); }
+        .dynamic-text { color: var(--primary); }
+        .tab-active { border-bottom: 2px solid var(--primary); color: var(--primary); font-weight: bold; }
+        .modal { transition: opacity 0.2s ease; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased">
-
-    <nav class="glass-panel sticky top-4 z-50 mx-4 md:mx-8 rounded-2xl shadow-md border border-white/40">
-        <div class="container mx-auto px-5 py-3 flex flex-wrap justify-between items-center">
-            <div class="flex items-center gap-3 cursor-pointer" onclick="location.hash='#/'">
-                <img id="site-logo" src="" class="h-9 w-auto rounded-full hidden object-contain">
-                <span id="site-name" class="text-2xl font-black tracking-tight dynamic-text">WORKSMART</span>
-            </div>
-            <div id="nav-links" class="hidden md:flex gap-8 text-sm font-semibold uppercase tracking-wide text-slate-500"></div>
-            <!-- No public admin button -->
-        </div>
+<body class="bg-slate-50">
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur border-b px-6 py-3 flex flex-wrap justify-between items-center gap-4">
+        <span class="text-2xl font-black dynamic-text">WORKSMART CMS</span>
+        <div id="public-nav" class="hidden md:flex gap-6 text-sm font-medium"></div>
+        <a href="#/admin-as" class="text-xs bg-slate-900 text-white px-4 py-2 rounded-full shadow">ADMIN</a>
     </nav>
-
-    <main id="app" class="container mx-auto px-5 py-8 min-h-[70vh] animate-fade-in"></main>
-
-    <footer class="mt-28 py-12 text-center text-slate-400 text-sm border-t border-slate-200 bg-white/50">
-        <p id="footer-text" class="tracking-wide">&copy; WorkSmart Tools</p>
-    </footer>
+    <main id="app" class="container mx-auto px-4 py-8 min-h-screen"></main>
+    <footer class="text-center text-slate-400 text-sm py-8 border-t">© WorkSmart — Dynamic CMS</footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbx3skjHuK-g_VsVrHHseuljBbvd8w25xE1fd3U5Yz-Cn7GCc1ZphuyLRcxq4a1XTKE7/exec"; // ✅ REPLACE WITH YOUR DEPLOYED URL
-        let store = { company: [], products: [], categories: [], pages: [] };
+        // ======================== CONFIGURATION ========================
+        const API_URL = "https://script.google.com/macros/s/AKfycbyW4njAVLJwvGveojZsw_ORdxLP14BpluHJv5ZAdGmKmk6lgEOL_KrmHESQYgD6fZOG/exec"; // 🔁 REPLACE WITH YOUR DEPLOYED URL
+        let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [] };
         let activeCategoryFilter = "all";
 
-        // ======================== FETCH & THEME ========================
+        // ======================== HELPER FUNCTIONS ========================
         async function fetchData() {
             try {
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
                 const json = await res.json();
-                store = json.data || { company: [], products: [], categories: [], pages: [] };
+                store = json.data || { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [] };
                 if (!store.categories) store.categories = [];
                 if (!store.pages) store.pages = [];
-                applyGlobalTheme();
-                updateMetaTagsForRoute();
-            } catch(e) { console.error("Sync error", e); }
+                if (!store.contentBlocks) store.contentBlocks = [];
+                if (!store.theme) store.theme = [];
+                if (!store.seoDefaults) store.seoDefaults = [];
+                applyTheme();
+                buildPublicNav();
+                updateMetaTags();
+                router();
+            } catch(e) { console.error("Fetch error", e); }
         }
 
-        function applyGlobalTheme() {
-            const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
-            document.documentElement.style.setProperty('--p-color', dict.primary_color || '#0f172a');
-            if(dict.font_size) document.body.style.fontSize = dict.font_size + "px";
-            document.getElementById('site-name').innerText = dict.company_name || "WORKSMART";
-            const logoImg = document.getElementById('site-logo');
-            if(dict.logo_url && dict.logo_url.trim()) {
-                logoImg.src = dict.logo_url;
-                logoImg.classList.remove('hidden');
-            } else logoImg.classList.add('hidden');
-            
-            // Build dynamic menu from pages + default links
-            const navDiv = document.getElementById('nav-links');
-            let menuItemsHtml = `<a href="#/" class="hover:dynamic-text transition">HOME</a>`;
-            const menuPages = (store.pages || []).filter(p => p.Status === 'published').sort((a,b) => (a.MenuOrder||0) - (b.MenuOrder||0));
-            menuPages.forEach(page => {
-                menuItemsHtml += `<a href="#/page/${page.Slug}" class="hover:dynamic-text transition">${escapeHtml(page.Title)}</a>`;
-            });
-            menuItemsHtml += `<a href="#/products" class="hover:dynamic-text transition">PRODUCTS</a>`;
-            navDiv.innerHTML = menuItemsHtml;
-            
-            document.getElementById('footer-text').innerHTML = `&copy; ${dict.company_name || 'WorkSmart'} — ${dict.footer_tagline || 'Precision engineering'}`;
-            if(dict.favicon_url) {
-                let link = document.querySelector("link[rel*='icon']") || document.createElement('link');
-                link.type = 'image/x-icon';
-                link.rel = 'shortcut icon';
-                link.href = dict.favicon_url;
-                document.head.appendChild(link);
-            }
+        function applyTheme() {
+            const theme = Object.fromEntries((store.theme || []).map(i => [i.Key, i.Value]));
+            document.documentElement.style.setProperty('--primary', theme.primary_color || '#0f172a');
+            document.documentElement.style.setProperty('--radius', (theme.card_radius || 16) + 'px');
+            document.body.style.backgroundColor = theme.body_bg || '#f8fafc';
+            document.body.style.fontSize = (theme.base_font_size || 16) + 'px';
+            if (theme.font_family) document.body.style.fontFamily = theme.font_family;
         }
 
-        function updateMetaTagsForRoute() {
-            const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
+        function buildPublicNav() {
+            const navDiv = document.getElementById('public-nav');
+            if (!navDiv) return;
+            let html = `<a href="#/" class="hover:dynamic-text">HOME</a>`;
+            const pages = (store.pages || []).filter(p => p.Status === 'published').sort((a,b) => (a.MenuOrder||0) - (b.MenuOrder||0));
+            pages.forEach(p => { html += `<a href="#/page/${p.Slug}" class="hover:dynamic-text">${escapeHtml(p.Title)}</a>`; });
+            html += `<a href="#/products" class="hover:dynamic-text">PRODUCTS</a>`;
+            navDiv.innerHTML = html;
+        }
+
+        function updateMetaTags() {
+            const seo = Object.fromEntries((store.seoDefaults || []).map(i => [i.Key, i.Value]));
+            const dict = Object.fromEntries((store.company || []).map(i => [i.Key, i.Value]));
             const hash = window.location.hash;
-            let title = dict.site_meta_title || dict.site_title || "WorkSmart CMS";
-            let description = dict.site_meta_description || dict.company_desc || "";
-            let keywords = dict.site_meta_keywords || "";
-            let ogImage = dict.og_image || "";
-            
-            if(hash.startsWith('#/product/')) {
-                const prodId = hash.split('/')[2];
-                const product = store.products.find(p => p.ID == prodId);
-                if(product) {
-                    title = product.SEOTitle || product.Title;
-                    description = product.SEODesc || product.Summary;
-                    keywords = product.SEOKeywords || "";
-                    ogImage = product.OGImage || product.Thumbnail;
-                    setMetaTag('og:title', product.OGTitle || title);
-                    setMetaTag('og:description', product.OGDesc || description);
-                    setMetaTag('og:image', ogImage);
-                    setMetaTag('twitter:card', product.TwitterCard || 'summary_large_image');
-                }
-            } else if(hash.startsWith('#/page/')) {
-                const slug = hash.split('/')[2];
-                const page = store.pages.find(p => p.Slug === slug);
-                if(page) {
-                    title = page.Title;
-                    description = page.Content.replace(/<[^>]*>/g, '').substring(0, 160);
-                }
-            } else {
-                setMetaTag('og:title', dict.site_meta_title || dict.site_title);
-                setMetaTag('og:description', dict.site_meta_description);
-                setMetaTag('og:image', dict.og_image);
-                setMetaTag('twitter:card', 'summary');
+            let title = dict.site_meta_title || dict.site_title || "WorkSmart";
+            let description = dict.site_meta_description || "";
+            if (hash.startsWith('#/product/')) {
+                const prod = store.products.find(p => p.ID === hash.split('/')[2]);
+                if (prod) { title = prod.SEOTitle || prod.Title; description = prod.SEODesc || prod.Summary; }
+            } else if (hash.startsWith('#/page/')) {
+                const page = store.pages.find(p => p.Slug === hash.split('/')[2]);
+                if (page) { title = page.Title; description = page.Content.replace(/<[^>]*>/g, '').slice(0, 160); }
             }
             document.title = title;
-            setMetaTag('description', description);
-            setMetaTag('keywords', keywords);
-        }
-        
-        function setMetaTag(name, content) {
-            if(!content) return;
-            let selector = name.startsWith('og:') ? `meta[property="${name}"]` : `meta[name="${name}"]`;
-            let meta = document.querySelector(selector);
-            if(!meta) {
-                meta = document.createElement('meta');
-                if(name.startsWith('og:')) meta.setAttribute('property', name);
-                else meta.setAttribute('name', name);
-                document.head.appendChild(meta);
-            }
-            meta.setAttribute('content', content);
-        }
-
-        window.addEventListener('hashchange', () => { updateMetaTagsForRoute(); router(); });
-        window.addEventListener('load', async () => { await fetchData(); router(); });
-
-        // ======================== ROUTER ========================
-        async function router() {
-            const hash = window.location.hash || '#/';
-            const app = document.getElementById('app');
-            if(hash === '#/') renderHome(app);
-            else if(hash === '#/products') renderProductList(app);
-            else if(hash.startsWith('#/product/')) renderProductDetail(app, hash.split('/')[2]);
-            else if(hash.startsWith('#/page/')) renderPage(app, hash.split('/')[2]);
-            else if(hash === '#/admin-as') renderAdmin(app);
-            else renderHome(app);
+            let meta = document.querySelector('meta[name="description"]');
+            if (!meta) { meta = document.createElement('meta'); meta.name = 'description'; document.head.appendChild(meta); }
+            meta.content = description;
         }
 
         function getCategoryName(catId) {
@@ -161,293 +97,259 @@
             return cat ? cat.Name : (catId === "general" ? "General" : catId);
         }
 
-        // ======================== FRONTEND VIEWS ========================
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
+
+        // ======================== IMAGE UPLOAD TO DRIVE ========================
+        async function uploadImageToDrive(fileInputId, targetInputId) {
+            const fileInput = document.getElementById(fileInputId);
+            if (!fileInput || !fileInput.files.length) { alert("Select a file first"); return; }
+            const formData = new FormData();
+            formData.append('action', 'uploadImage');
+            formData.append('file', fileInput.files[0]);
+            formData.append('filename', fileInput.files[0].name);
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: formData });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    document.getElementById(targetInputId).value = json.url;
+                    alert("Image uploaded! URL inserted.");
+                } else { alert("Upload failed: " + json.message); }
+            } catch(e) { alert("Upload error"); }
+        }
+
+        // ======================== ROUTER ========================
+        window.addEventListener('hashchange', () => { updateMetaTags(); router(); });
+        window.addEventListener('load', fetchData);
+
+        async function router() {
+            const hash = window.location.hash || '#/';
+            const app = document.getElementById('app');
+            if (hash === '#/') renderHome(app);
+            else if (hash === '#/products') renderProductList(app);
+            else if (hash.startsWith('#/product/')) renderProductDetail(app, hash.split('/')[2]);
+            else if (hash.startsWith('#/page/')) renderPage(app, hash.split('/')[2]);
+            else if (hash === '#/admin-as') renderAdmin(app);
+            else renderHome(app);
+        }
+
+        // ======================== PUBLIC VIEWS ========================
         function renderHome(container) {
-            const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
+            const blocks = store.contentBlocks || [];
+            const hero = blocks.find(b => b.BlockName === 'hero') || { Content: '<h1 class="text-5xl font-black">Welcome to WorkSmart</h1><p>Powerful CMS</p>' };
+            const features = blocks.find(b => b.BlockName === 'features') || { Content: '<div class="p-6 bg-white rounded-2xl shadow">Feature 1</div><div class="p-6 bg-white rounded-2xl shadow">Feature 2</div><div class="p-6 bg-white rounded-2xl shadow">Feature 3</div>' };
             container.innerHTML = `
-                <section class="rounded-[3rem] p-8 md:p-20 my-8 text-center md:text-left" style="background: radial-gradient(circle at 10% 20%, rgba(255,255,255,0.9) 0%, #f8fafc 90%);">
-                    <div class="max-w-4xl mx-auto">
-                        <h1 class="text-6xl md:text-7xl font-black tracking-tighter dynamic-text mb-6 leading-[1.1]">${escapeHtml(dict.site_title || 'WorkSmart Ecosystem')}</h1>
-                        <p class="text-xl text-slate-500 max-w-2xl mx-auto md:mx-0 leading-relaxed">${escapeHtml(dict.company_moto || dict.company_desc || 'Streamline, automate, and scale.')}</p>
-                    </div>
-                </section>
-                <div class="my-24 grid md:grid-cols-2 gap-12 items-center">
-                    <div>
-                        <span class="text-xs font-black uppercase tracking-wider dynamic-text">● methodology</span>
-                        <h2 class="text-4xl font-black mt-3 mb-6 tracking-tight">How it <span class="dynamic-text">works</span></h2>
-                        <div class="prose prose-lg text-slate-500">${escapeHtml(dict.how_it_works || '<p>Real‑time sync, headless architecture, zero‑maintenance.</p>')}</div>
-                    </div>
-                    <div class="bg-white/60 rounded-[2rem] p-8 border shadow-sm">
-                        <div class="text-6xl mb-4">⚡</div>
-                        <h3 class="font-bold text-2xl">Zero‑cost cloud</h3>
-                        <p class="text-slate-500 mt-2">GitHub Pages + Google Apps Script, enterprise-ready.</p>
-                    </div>
-                </div>
+                <div class="prose max-w-none mb-12">${hero.Content}</div>
+                <div class="grid md:grid-cols-3 gap-8 my-12">${features.Content}</div>
             `;
         }
 
         function renderProductList(container) {
-            const filteredProducts = activeCategoryFilter === "all" ? store.products : store.products.filter(p => p.Category == activeCategoryFilter);
-            const categoriesList = store.categories.length ? store.categories : [{ID:"general", Name:"General"}];
+            const filtered = activeCategoryFilter === "all" ? store.products : store.products.filter(p => p.Category == activeCategoryFilter);
+            const cats = store.categories.length ? store.categories : [{ID:"general", Name:"General"}];
             container.innerHTML = `
-                <div class="my-12 flex flex-wrap gap-3 justify-center border-t border-b py-6 border-slate-100">
-                    <button data-cat="all" class="category-pill px-6 py-2 rounded-full text-sm font-bold bg-slate-100 hover:dynamic-bg hover:text-white transition">ALL</button>
-                    ${categoriesList.map(cat => `<button data-cat="${cat.ID}" class="category-pill px-6 py-2 rounded-full text-sm font-bold bg-slate-100 hover:dynamic-bg hover:text-white transition">${escapeHtml(cat.Name.toUpperCase())}</button>`).join('')}
+                <div class="flex flex-wrap gap-3 justify-center border-b pb-6 mb-8">
+                    <button data-cat="all" class="cat-pill px-5 py-2 rounded-full text-sm font-medium bg-slate-100 hover:dynamic-bg hover:text-white transition">ALL</button>
+                    ${cats.map(c => `<button data-cat="${c.ID}" class="cat-pill px-5 py-2 rounded-full text-sm font-medium bg-slate-100 hover:dynamic-bg hover:text-white transition">${escapeHtml(c.Name.toUpperCase())}</button>`).join('')}
                 </div>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-10 mt-8">
-                    ${filteredProducts.length ? filteredProducts.map(p => `
-                        <div class="bg-white rounded-3xl overflow-hidden shadow-md card-hover cursor-pointer group border border-slate-100" onclick="location.hash='#/product/${p.ID}'">
-                            <div class="relative h-64 overflow-hidden">
-                                <img src="${p.Thumbnail || 'https://placehold.co/600x400?text=WorkSmart'}" class="w-full h-full object-cover group-hover:scale-105 transition duration-700">
-                            </div>
-                            <div class="p-8">
-                                <div class="text-xs dynamic-text font-black mb-2 uppercase tracking-wider">${getCategoryName(p.Category)}</div>
-                                <h3 class="text-2xl font-extrabold tracking-tight mb-3">${escapeHtml(p.Title)}</h3>
-                                <p class="text-slate-500 text-sm line-clamp-2">${escapeHtml(p.Summary)}</p>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                    ${filtered.length ? filtered.map(p => `
+                        <div class="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition cursor-pointer" onclick="location.hash='#/product/${p.ID}'">
+                            <img src="${p.Thumbnail || 'https://placehold.co/600x400?text=No+Image'}" class="w-full h-56 object-cover">
+                            <div class="p-5">
+                                <div class="text-xs dynamic-text font-bold mb-1">${getCategoryName(p.Category)}</div>
+                                <h3 class="text-xl font-extrabold">${escapeHtml(p.Title)}</h3>
+                                <p class="text-slate-500 text-sm mt-2 line-clamp-2">${escapeHtml(p.Summary)}</p>
                             </div>
                         </div>
-                    `).join('') : `<div class="col-span-full text-center py-20 text-slate-400">✨ No products in this category.</div>`}
+                    `).join('') : '<div class="col-span-full text-center py-20 text-slate-400">No products found.</div>'}
                 </div>
             `;
-            document.querySelectorAll('[data-cat]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    activeCategoryFilter = btn.getAttribute('data-cat');
-                    renderProductList(container);
-                });
-                if(activeCategoryFilter === btn.getAttribute('data-cat')) btn.classList.add('active', 'dynamic-bg', 'text-white');
-                else btn.classList.remove('active', 'dynamic-bg', 'text-white');
+            document.querySelectorAll('.cat-pill').forEach(btn => {
+                btn.onclick = () => { activeCategoryFilter = btn.getAttribute('data-cat'); renderProductList(container); };
+                if (activeCategoryFilter === btn.getAttribute('data-cat')) btn.classList.add('dynamic-bg', 'text-white');
+                else btn.classList.remove('dynamic-bg', 'text-white');
             });
         }
 
         function renderProductDetail(container, id) {
-            const product = store.products.find(p => p.ID == id);
-            if(!product) { container.innerHTML = `<div class='text-center py-32 text-red-400'>Product not found</div>`; return; }
-            const imagesArr = product.Images ? product.Images.split(',').map(i => i.trim()) : (product.Thumbnail ? [product.Thumbnail] : []);
+            const p = store.products.find(x => x.ID == id);
+            if (!p) { container.innerHTML = '<div class="text-center py-20">Product not found</div>'; return; }
+            const images = p.Images ? p.Images.split(',').map(i => i.trim()) : (p.Thumbnail ? [p.Thumbnail] : []);
             const swiperId = `swiper-${Date.now()}`;
             container.innerHTML = `
-                <div class="max-w-6xl mx-auto py-8">
-                    <button onclick="history.back()" class="mb-8 flex items-center gap-2 text-slate-400 hover:dynamic-text text-sm font-bold transition">← Back</button>
-                    <div class="grid lg:grid-cols-2 gap-12 items-start">
-                        <div class="relative rounded-2xl overflow-hidden shadow-2xl">
-                            <div class="swiper ${swiperId} rounded-2xl">
-                                <div class="swiper-wrapper">
-                                    ${imagesArr.map(img => `<div class="swiper-slide"><img src="${img}" class="w-full h-[450px] object-cover"></div>`).join('')}
-                                </div>
-                                <div class="swiper-button-next"></div>
-                                <div class="swiper-button-prev"></div>
-                                <div class="swiper-pagination"></div>
+                <div class="max-w-6xl mx-auto">
+                    <button onclick="history.back()" class="mb-6 text-slate-400 hover:dynamic-text text-sm">← Back</button>
+                    <div class="grid md:grid-cols-2 gap-10">
+                        <div class="relative rounded-2xl overflow-hidden shadow-xl">
+                            <div class="swiper ${swiperId}">
+                                <div class="swiper-wrapper">${images.map(img => `<div class="swiper-slide"><img src="${img}" class="w-full h-96 object-cover"></div>`).join('')}</div>
+                                <div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div>
                             </div>
                         </div>
-                        <div class="space-y-7">
-                            <h1 class="text-5xl font-black tracking-tight dynamic-text">${escapeHtml(product.Title)}</h1>
-                            <div class="bg-white/70 p-6 rounded-2xl border border-slate-100">
-                                <h4 class="text-xs font-black dynamic-text uppercase tracking-wider">⚙️ Technical Specifications</h4>
-                                <div class="mt-4 text-slate-600 text-sm leading-relaxed whitespace-pre-line">${escapeHtml(product.Technical_Info || 'Advanced engineering datasheet available on request.')}</div>
-                            </div>
-                        </div>
+                        <div><h1 class="text-4xl font-black dynamic-text">${escapeHtml(p.Title)}</h1><div class="mt-6 bg-white p-5 rounded-2xl shadow-sm"><h4 class="font-bold">Technical Info</h4><div class="text-slate-600 text-sm whitespace-pre-line mt-2">${escapeHtml(p.Technical_Info || 'No data')}</div></div></div>
                     </div>
-                    <div class="mt-20 grid md:grid-cols-2 gap-10">
-                        <div class="bg-white p-8 rounded-3xl shadow-sm border">
-                            <h3 class="text-2xl font-bold mb-4">📘 Description</h3>
-                            <div class="text-slate-600 leading-relaxed whitespace-pre-line">${escapeHtml(product.Description || 'No extended description provided.')}</div>
-                        </div>
-                        <div class="space-y-8">
-                            ${product.Terms ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">📜 Terms</h3><div class="text-slate-500 text-sm">${escapeHtml(product.Terms)}</div></div>` : ''}
-                            ${product.Privacy ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">🔒 Privacy</h3><div class="text-slate-500 text-sm">${escapeHtml(product.Privacy)}</div></div>` : ''}
-                            ${product.ServiceCommitment ? `<div class="bg-white p-8 rounded-3xl shadow-sm border"><h3 class="font-bold text-xl mb-3">🤝 Service</h3><div class="text-slate-500 text-sm">${escapeHtml(product.ServiceCommitment)}</div></div>` : ''}
-                        </div>
+                    <div class="mt-16 grid md:grid-cols-2 gap-8">
+                        <div class="bg-white p-6 rounded-2xl shadow"><h3 class="font-bold text-xl">Description</h3><div class="mt-3 text-slate-600">${escapeHtml(p.Description || '')}</div></div>
+                        <div class="space-y-6">${p.Terms ? `<div class="bg-white p-6 rounded-2xl"><h3 class="font-bold">Terms</h3><div class="text-sm text-slate-500">${escapeHtml(p.Terms)}</div></div>` : ''}${p.Privacy ? `<div class="bg-white p-6 rounded-2xl"><h3 class="font-bold">Privacy</h3><div class="text-sm text-slate-500">${escapeHtml(p.Privacy)}</div></div>` : ''}</div>
                     </div>
                 </div>
             `;
-            setTimeout(() => {
-                new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, loop: imagesArr.length > 1 });
-            }, 50);
+            setTimeout(() => { new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, loop: images.length > 1 }); }, 50);
         }
 
         function renderPage(container, slug) {
             const page = store.pages.find(p => p.Slug === slug);
-            if(!page) { container.innerHTML = `<div class='text-center py-32'>Page not found</div>`; return; }
-            container.innerHTML = `<div class="max-w-4xl mx-auto py-12 prose prose-lg">${page.Content || '<p>No content yet.</p>'}</div>`;
+            if (!page) { container.innerHTML = '<div class="text-center py-20">Page not found</div>'; return; }
+            container.innerHTML = `<div class="max-w-4xl mx-auto prose prose-lg">${page.Content || '<p>No content yet.</p>'}</div>`;
         }
 
-        // ======================== ADMIN PANEL ========================
+        // ======================== ADMIN PANEL (TABBED, FULL CONTROL) ========================
         function renderAdmin(container) {
             const token = localStorage.getItem('ws_token');
-            if(!token) {
-                container.innerHTML = `<div class="max-w-md mx-auto bg-white/80 backdrop-blur-sm p-12 rounded-[3rem] shadow-2xl mt-20 border"><h2 class="text-3xl font-black mb-8 text-center">ADMIN ACCESS</h2><input id="adminUser" class="w-full border-b py-4 mb-5 outline-none" placeholder="Username"><input id="adminPass" type="password" class="w-full border-b py-4 mb-8 outline-none" placeholder="Password"><button onclick="adminLogin()" class="w-full dynamic-bg text-white py-4 rounded-2xl font-black tracking-wider">UNLOCK PANEL</button></div>`;
+            if (!token) {
+                container.innerHTML = `<div class="max-w-md mx-auto bg-white p-10 rounded-2xl shadow-lg mt-12"><h2 class="text-2xl font-black mb-6">Admin Login</h2><input id="admUser" class="w-full border p-3 rounded-lg mb-4" placeholder="Username"><input id="admPass" type="password" class="w-full border p-3 rounded-lg mb-6" placeholder="Password"><button onclick="adminLogin()" class="btn-primary w-full py-3 rounded-lg font-bold">LOGIN</button></div>`;
                 return;
             }
-            const dict = Object.fromEntries(store.company.map(i => [i.Key, i.Value]));
             container.innerHTML = `
-                <div class="flex justify-between items-center mb-8 flex-wrap gap-4"><h2 class="text-4xl font-black tracking-tighter">⚡ ADMIN WORKSPACE</h2><button onclick="adminLogout()" class="text-xs font-bold text-red-500 border border-red-200 px-5 py-2 rounded-full hover:bg-red-50">LOGOUT</button></div>
-                <div class="grid lg:grid-cols-3 gap-8 mb-12">
-                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">🏢 Brand & Content</h3><label class="text-xs uppercase font-bold">Site Title</label><input id="site_title" value="${escapeHtml(dict.site_title || '')}" class="w-full border rounded-xl p-3 mb-3"><label>Company Name</label><input id="company_name" value="${escapeHtml(dict.company_name || '')}" class="w-full border rounded-xl p-3 mb-3"><label>Moto / Tagline</label><textarea id="company_moto" class="w-full border rounded-xl p-3">${escapeHtml(dict.company_moto || '')}</textarea><label>How it works</label><textarea id="how_it_works" class="w-full border rounded-xl p-3 h-28">${escapeHtml(dict.how_it_works || '')}</textarea><label>Logo URL</label><input id="logo_url" value="${escapeHtml(dict.logo_url || '')}" class="w-full border rounded-xl p-3 mb-2"></div>
-                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">🎨 Theme & SEO</h3><label>Primary Color</label><input type="color" id="primary_color" value="${dict.primary_color || '#0f172a'}" class="w-full h-12 mb-3"><label>Font size (px)</label><input id="font_size" type="number" value="${dict.font_size || '16'}" class="w-full border rounded-xl p-3 mb-3"><label>Menu items (comma) - Legacy</label><input id="menu_items" value="${escapeHtml(dict.menu_items || '')}" class="w-full border rounded-xl p-3 mb-3"><label>Favicon URL</label><input id="favicon_url" value="${escapeHtml(dict.favicon_url || '')}" class="w-full border rounded-xl p-3"><label>Site Meta Title</label><input id="site_meta_title" value="${escapeHtml(dict.site_meta_title || '')}" class="w-full border rounded-xl p-3 mt-2"><label>Site Meta Description</label><textarea id="site_meta_description" class="w-full border rounded-xl p-3">${escapeHtml(dict.site_meta_description || '')}</textarea></div>
-                    <div class="bg-white rounded-3xl p-7 shadow-md border"><h3 class="font-black dynamic-text mb-6">📦 Quick Actions</h3><button onclick="saveAllSettings()" class="w-full dynamic-bg text-white py-3 rounded-xl font-bold mb-4">💾 SAVE ALL SETTINGS</button><button onclick="openProductModal()" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold">+ ADD NEW PRODUCT</button><hr class="my-6"><button onclick="manageCategoriesUI()" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">📂 MANAGE CATEGORIES</button><button onclick="openPageModal()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold mt-3">📄 MANAGE PAGES</button></div>
+                <div class="flex justify-between items-center flex-wrap gap-4 mb-8"><h1 class="text-3xl font-black">⚡ Admin Console</h1><button onclick="adminLogout()" class="text-red-500 border border-red-300 px-5 py-2 rounded-full text-sm">Logout</button></div>
+                <div class="flex flex-wrap gap-1 border-b mb-6">
+                    <button data-tab="site" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">🎨 Site & Theme</button>
+                    <button data-tab="blocks" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">🧩 Content Blocks</button>
+                    <button data-tab="pages" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">📄 Pages (Menu)</button>
+                    <button data-tab="products" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">📦 Products</button>
+                    <button data-tab="seo" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">🔍 SEO Global</button>
                 </div>
-                <div class="bg-white rounded-3xl shadow-lg overflow-hidden"><div class="p-6 border-b"><h3 class="text-2xl font-black">📦 PRODUCT INVENTORY</h3></div><table class="w-full text-left"><thead class="bg-slate-50"><tr><th class="p-5">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody id="inventoryTableBody"></tbody></table></div>
+                <div id="tab-content"></div>
             `;
-            renderInventoryTable();
+            document.querySelectorAll('.tab-btn').forEach(btn => { btn.onclick = () => loadTab(btn.getAttribute('data-tab')); });
+            loadTab('site');
         }
 
-        function renderInventoryTable() {
-            const tbody = document.getElementById('inventoryTableBody');
-            if(!tbody) return;
-            tbody.innerHTML = store.products.map(p => `
-                <tr class="border-b">
-                    <td class="p-5 font-bold">${escapeHtml(p.Title)}</td>
-                    <td>${getCategoryName(p.Category)}</td>
-                    <td class="p-5 text-right space-x-3">
-                        <button onclick="openProductModal('${p.ID}')" class="text-blue-600 text-xs font-black uppercase">Edit</button>
-                        <button onclick="deleteProductItem('${p.ID}')" class="text-red-500 text-xs font-black uppercase">Delete</button>
-                    </td>
-                </tr>
+        async function loadTab(tab) {
+            const div = document.getElementById('tab-content');
+            if (!div) return;
+            if (tab === 'site') {
+                const theme = Object.fromEntries((store.theme || []).map(i => [i.Key, i.Value]));
+                const company = Object.fromEntries((store.company || []).map(i => [i.Key, i.Value]));
+                div.innerHTML = `
+                    <div class="bg-white p-6 rounded-2xl shadow-md space-y-4">
+                        <h3 class="font-black text-xl">Theme & Design</h3>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <label>Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color || '#0f172a'}" class="border rounded h-10"><label>Body Background</label><input type="color" id="body_bg" value="${theme.body_bg || '#f8fafc'}" class="border rounded h-10"><label>Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius || 16}" class="border rounded p-2"><label>Base Font (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size || 16}" class="border rounded p-2"><label>Font Family</label><input id="font_family" value="${theme.font_family || 'Inter'}" class="border rounded p-2"></div>
+                        <button onclick="saveTheme()" class="btn-primary px-6 py-2 rounded-lg">Save Theme</button>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-md mt-6 space-y-3">
+                        <h3 class="font-black">Company Info</h3>
+                        <div class="grid md:grid-cols-2 gap-3">${Object.entries(company).map(([k,v]) => `<div><label class="text-xs">${k}</label><input id="comp_${k}" value="${escapeHtml(v)}" class="w-full border p-2 rounded"></div>`).join('')}</div>
+                        <button onclick="saveCompanyInfo()" class="btn-primary px-6 py-2 rounded-lg">Save Company</button>
+                    </div>
+                `;
+            } else if (tab === 'blocks') {
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="blocksList"></div><button onclick="newContentBlock()" class="btn-primary px-4 py-2 rounded-lg mt-4">+ Add Block</button></div>`;
+                renderBlocksList();
+            } else if (tab === 'pages') {
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="pagesList"></div><button onclick="openPageModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">+ New Page</button></div>`;
+                renderPagesHierarchy();
+            } else if (tab === 'products') {
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><button onclick="openProductModal()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg mb-4">+ New Product</button><div id="productsTable"></div></div>`;
+                renderProductsTable();
+            } else if (tab === 'seo') {
+                const seo = Object.fromEntries((store.seoDefaults || []).map(i => [i.Key, i.Value]));
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO Defaults</h3><div class="grid md:grid-cols-2 gap-3"><label>Default Title</label><input id="seo_title" value="${seo.default_title || ''}" class="border p-2 rounded"><label>Default Description</label><textarea id="seo_desc" class="border p-2 rounded">${seo.default_description || ''}</textarea><label>Default OG Image</label><input id="seo_ogimage" value="${seo.default_og_image || ''}" class="border p-2 rounded"><label>Twitter Handle</label><input id="seo_twitter" value="${seo.twitter_handle || ''}" class="border p-2 rounded"></div><button onclick="saveSeoDefaults()" class="btn-primary px-6 py-2 rounded-lg">Save SEO</button></div>`;
+            }
+        }
+
+        function renderBlocksList() {
+            const container = document.getElementById('blocksList');
+            if (!container) return;
+            container.innerHTML = (store.contentBlocks || []).map(b => `
+                <div class="border-b py-3 flex justify-between items-start"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type})<br><div class="text-xs text-slate-500">${escapeHtml(b.Content?.substring(0,80))}...</div></div><div><button onclick="editContentBlock('${b.BlockID}')" class="text-blue-500 text-xs mr-2">Edit</button><button onclick="deleteContentBlock('${b.BlockID}')" class="text-red-500 text-xs">Delete</button></div></div>
             `).join('');
         }
 
-        // ======================== CATEGORY MANAGEMENT ========================
-        window.manageCategoriesUI = () => {
-            const cats = store.categories || [];
-            const html = `<div id="catModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-md rounded-3xl p-6"><h3 class="text-2xl font-black mb-4">Manage Categories</h3><div id="catList" class="max-h-64 overflow-y-auto space-y-2 mb-4">${cats.map(c => `<div class="flex justify-between items-center border-b py-2"><span>${escapeHtml(c.Name)}</span><button onclick="deleteCategory('${c.ID}')" class="text-red-400 text-xs">Delete</button></div>`).join('')}</div><div class="flex gap-2"><input id="newCatName" placeholder="New category name" class="flex-1 border rounded-xl p-2"><button onclick="addNewCategory()" class="dynamic-bg text-white px-5 py-2 rounded-xl">Add</button></div><button onclick="closeCatModal()" class="mt-4 w-full border py-2 rounded-xl">Close</button></div></div>`;
-            document.body.insertAdjacentHTML('beforeend', html);
-        };
-        window.closeCatModal = () => document.getElementById('catModal')?.remove();
-        window.addNewCategory = async () => {
-            const name = document.getElementById('newCatName')?.value.trim();
-            if(!name) return;
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveCategory', data: { id: null, name } }) });
-            location.reload();
-        };
-        window.deleteCategory = async (id) => { if(confirm('Delete category?')) { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteCategory', data: { id } }) }); location.reload(); } };
+        function renderPagesHierarchy() {
+            const pages = store.pages || [];
+            const container = document.getElementById('pagesList');
+            if (!container) return;
+            container.innerHTML = pages.map(page => `
+                <div class="border-b py-3 flex justify-between items-center"><div><span class="font-bold">${escapeHtml(page.Title)}</span> <span class="text-xs text-slate-400">/${page.Slug}</span> ${page.ParentID ? `<span class="text-xs bg-slate-100 px-2 ml-2">child</span>` : ''}</div><div><button onclick="openPageModal('${page.ID}')" class="text-blue-500 text-xs mr-2">Edit</button><button onclick="deletePageItem('${page.ID}')" class="text-red-500 text-xs">Delete</button></div></div>
+            `).join('');
+        }
 
-        // ======================== PAGE MANAGEMENT ========================
-        window.openPageModal = (id = null) => {
-            const page = id ? store.pages.find(p => p.ID == id) : { ID: '', Slug: '', Title: '', Content: '', MenuOrder: 0, Status: 'published' };
-            const modalHtml = `
-                <div id="pageModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 overflow-auto">
-                    <div class="bg-white w-full max-w-3xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
-                        <h2 class="text-3xl font-black mb-6">${id ? '✏️ EDIT PAGE' : '📄 CREATE PAGE'}</h2>
-                        <input type="hidden" id="page_id" value="${page.ID}">
-                        <div class="space-y-4">
-                            <div><label class="font-bold">Title</label><input id="page_title" value="${escapeHtml(page.Title)}" class="w-full border rounded-xl p-3"></div>
-                            <div><label class="font-bold">Slug (URL: /page/xxx)</label><input id="page_slug" value="${escapeHtml(page.Slug)}" class="w-full border rounded-xl p-3"></div>
-                            <div><label class="font-bold">Menu Order</label><input id="page_order" type="number" value="${page.MenuOrder || 0}" class="w-full border rounded-xl p-3"></div>
-                            <div><label class="font-bold">Status</label><select id="page_status" class="w-full border rounded-xl p-3"><option value="published" ${page.Status === 'published' ? 'selected' : ''}>Published</option><option value="draft" ${page.Status === 'draft' ? 'selected' : ''}>Draft</option></select></div>
-                            <div><label class="font-bold">Content (HTML allowed)</label><textarea id="page_content" rows="10" class="w-full border rounded-xl p-3 font-mono">${escapeHtml(page.Content || '')}</textarea></div>
-                        </div>
-                        <div class="flex gap-4 mt-8"><button onclick="submitPageForm()" class="dynamic-bg text-white px-10 py-3 rounded-xl font-bold">PUBLISH</button><button onclick="closePageModal()" class="bg-slate-100 px-8 py-3 rounded-xl">Cancel</button></div>
-                    </div>
-                </div>`;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-        };
-        window.submitPageForm = async () => {
-            const data = {
-                id: document.getElementById('page_id').value,
-                title: document.getElementById('page_title').value,
-                slug: document.getElementById('page_slug').value,
-                content: document.getElementById('page_content').value,
-                menuOrder: parseInt(document.getElementById('page_order').value) || 0,
-                status: document.getElementById('page_status').value
-            };
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'savePage', data }) });
-            location.reload();
-        };
-        window.closePageModal = () => document.getElementById('pageModal')?.remove();
-        window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
+        function renderProductsTable() {
+            const container = document.getElementById('productsTable');
+            if (!container) return;
+            container.innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModal('${p.ID}')" class="text-blue-500 text-xs mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500 text-xs">Delete</button></td></tr>`).join('')}</tbody></table>`;
+        }
 
-        // ======================== PRODUCT MODAL (with full SEO) ========================
-        window.openProductModal = (id = null) => {
-            const prod = id ? store.products.find(p => p.ID == id) : { ID: '', Title: '', Thumbnail: '', Images: '', Summary: '', Description: '', Technical_Info: '', Terms: '', Privacy: '', ServiceCommitment: '', SEOTitle: '', SEODesc: '', SEOKeywords: '', OGTitle: '', OGDesc: '', OGImage: '', TwitterCard: '', Category: store.categories[0]?.ID || 'general' };
-            const categoriesOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category == c.ID ? 'selected' : ''}>${escapeHtml(c.Name)}</option>`).join('');
-            const modalHtml = `
-                <div id="productModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-4 overflow-auto">
-                    <div class="bg-white w-full max-w-5xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
-                        <h2 class="text-3xl font-black mb-6">${id ? '✏️ EDIT PRODUCT' : '✨ CREATE PRODUCT'}</h2>
-                        <input type="hidden" id="prod_id" value="${prod.ID}">
-                        <div class="grid md:grid-cols-2 gap-6">
-                            <div class="space-y-4">
-                                <label class="font-bold">Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border rounded-xl p-3">
-                                <label>Category</label><select id="prod_cat" class="w-full border rounded-xl p-3">${categoriesOptions}</select>
-                                <label>Thumbnail URL</label><input id="prod_thumb" value="${escapeHtml(prod.Thumbnail || '')}" class="w-full border rounded-xl p-3">
-                                <label>Images (comma separated URLs for carousel)</label><textarea id="prod_images" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.Images || '')}</textarea>
-                                <label>Summary (short)</label><textarea id="prod_summary" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.Summary || '')}</textarea>
-                                <label>Full Description</label><textarea id="prod_desc" class="w-full border rounded-xl p-3" rows="4">${escapeHtml(prod.Description || '')}</textarea>
-                            </div>
-                            <div class="space-y-4">
-                                <label>Technical Info</label><textarea id="prod_tech" class="w-full border rounded-xl p-3" rows="3">${escapeHtml(prod.Technical_Info || '')}</textarea>
-                                <label>Terms of Service</label><textarea id="prod_terms" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.Terms || '')}</textarea>
-                                <label>Privacy Policy</label><textarea id="prod_privacy" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.Privacy || '')}</textarea>
-                                <label>Service Commitment</label><textarea id="prod_service" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.ServiceCommitment || '')}</textarea>
-                                <hr><h4 class="font-bold">SEO & Social</h4>
-                                <label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle || '')}" class="w-full border rounded-xl p-3">
-                                <label>SEO Description</label><textarea id="prod_seod" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.SEODesc || '')}</textarea>
-                                <label>SEO Keywords</label><input id="prod_seok" value="${escapeHtml(prod.SEOKeywords || '')}" class="w-full border rounded-xl p-3">
-                                <label>OG Title</label><input id="prod_ogtitle" value="${escapeHtml(prod.OGTitle || '')}" class="w-full border rounded-xl p-3">
-                                <label>OG Description</label><textarea id="prod_ogdesc" class="w-full border rounded-xl p-3" rows="2">${escapeHtml(prod.OGDesc || '')}</textarea>
-                                <label>OG Image URL</label><input id="prod_ogimage" value="${escapeHtml(prod.OGImage || '')}" class="w-full border rounded-xl p-3">
-                                <label>Twitter Card Type</label><input id="prod_twcard" value="${escapeHtml(prod.TwitterCard || 'summary_large_image')}" class="w-full border rounded-xl p-3">
-                            </div>
-                        </div>
-                        <div class="flex gap-4 mt-8"><button onclick="submitProductForm()" class="dynamic-bg text-white px-10 py-3 rounded-xl font-bold">PUBLISH</button><button onclick="closeProductModal()" class="bg-slate-100 px-8 py-3 rounded-xl">Cancel</button></div>
-                    </div>
-                </div>`;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-        };
-        window.submitProductForm = async () => {
-            const data = {
-                id: document.getElementById('prod_id').value,
-                catId: document.getElementById('prod_cat').value,
-                title: document.getElementById('prod_title').value,
-                thumb: document.getElementById('prod_thumb').value,
-                imgs: document.getElementById('prod_images').value,
-                summary: document.getElementById('prod_summary').value,
-                desc: document.getElementById('prod_desc').value,
-                tech: document.getElementById('prod_tech').value,
-                terms: document.getElementById('prod_terms').value,
-                privacy: document.getElementById('prod_privacy').value,
-                serviceCommitment: document.getElementById('prod_service').value,
-                seoT: document.getElementById('prod_seot').value,
-                seoD: document.getElementById('prod_seod').value,
-                seoK: document.getElementById('prod_seok').value,
-                ogTitle: document.getElementById('prod_ogtitle').value,
-                ogDesc: document.getElementById('prod_ogdesc').value,
-                ogImage: document.getElementById('prod_ogimage').value,
-                twCard: document.getElementById('prod_twcard').value
-            };
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveProduct', data }) });
-            location.reload();
-        };
-        window.closeProductModal = () => document.getElementById('productModal')?.remove();
-        window.deleteProductItem = async (id) => { if(confirm('Permanently delete?')) { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: { id } }) }); location.reload(); } };
-
-        // ======================== SETTINGS SAVE ========================
-        window.saveAllSettings = async () => {
-            const settings = {
-                site_title: document.getElementById('site_title')?.value,
-                company_name: document.getElementById('company_name')?.value,
-                company_moto: document.getElementById('company_moto')?.value,
-                how_it_works: document.getElementById('how_it_works')?.value,
-                logo_url: document.getElementById('logo_url')?.value,
-                primary_color: document.getElementById('primary_color')?.value,
-                font_size: document.getElementById('font_size')?.value,
-                menu_items: document.getElementById('menu_items')?.value,
-                favicon_url: document.getElementById('favicon_url')?.value,
-                site_meta_title: document.getElementById('site_meta_title')?.value,
-                site_meta_description: document.getElementById('site_meta_description')?.value
-            };
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateSettings', data: settings }) });
-            location.reload();
-        };
-
-        // ======================== AUTH ========================
+        // ======================== CRUD ACTIONS ========================
         window.adminLogin = async () => {
-            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', data: { username: document.getElementById('adminUser').value, password: document.getElementById('adminPass').value } }) });
+            const res = await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'login', data:{ username:document.getElementById('admUser').value, password:document.getElementById('admPass').value } }) });
             const json = await res.json();
-            if(json.status === 'success') { localStorage.setItem('ws_token', json.token); router(); } else alert('Invalid credentials');
+            if (json.status === 'success') { localStorage.setItem('ws_token', json.token); router(); } else alert('Invalid credentials');
         };
         window.adminLogout = () => { localStorage.removeItem('ws_token'); router(); };
 
-        function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+        window.saveTheme = async () => {
+            const data = { primary_color: document.getElementById('primary_color')?.value, body_bg: document.getElementById('body_bg')?.value, card_radius: document.getElementById('card_radius')?.value, base_font_size: document.getElementById('base_font_size')?.value, font_family: document.getElementById('font_family')?.value };
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateTheme', data }) });
+            location.reload();
+        };
+        window.saveCompanyInfo = async () => {
+            const data = {}; document.querySelectorAll('[id^="comp_"]').forEach(inp => { data[inp.id.replace('comp_','')] = inp.value; });
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSettings', data }) });
+            location.reload();
+        };
+        window.saveSeoDefaults = async () => {
+            const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_og_image: document.getElementById('seo_ogimage')?.value, twitter_handle: document.getElementById('seo_twitter')?.value };
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSeoDefaults', data }) });
+            location.reload();
+        };
+
+        // Content Blocks
+        window.newContentBlock = () => openContentBlockModal();
+        window.editContentBlock = (id) => openContentBlockModal(id);
+        window.deleteContentBlock = async (id) => { if(confirm('Delete block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
+        function openContentBlockModal(id=null) {
+            const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'text', Content:'', Order:0 };
+            const html = `<div id="blockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name (e.g., hero)" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3"><option value="text" ${block.Type==='text'?'selected':''}>Text/HTML</option><option value="image" ${block.Type==='image'?'selected':''}>Image</option></select><textarea id="block_content" rows="6" class="w-full border p-3 rounded mb-3" placeholder="HTML content">${escapeHtml(block.Content)}</textarea><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-4"><div class="flex gap-3"><button onclick="submitContentBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+        window.submitContentBlock = async () => {
+            const data = { id: document.getElementById('block_id').value, blockName: document.getElementById('block_name').value, type: document.getElementById('block_type').value, content: document.getElementById('block_content').value, order: document.getElementById('block_order').value };
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
+            location.reload();
+        };
+
+        // Pages
+        window.openPageModal = (id=null) => {
+            const page = id ? store.pages.find(p => p.ID == id) : { ID:'', Slug:'', Title:'', Content:'', MenuOrder:0, Status:'published', ParentID:'' };
+            const parentOptions = `<option value="">None (Root)</option>` + (store.pages || []).filter(p => p.ID !== page.ID).map(p => `<option value="${p.ID}" ${page.ParentID===p.ID?'selected':''}>${escapeHtml(p.Title)}</option>`).join('');
+            const html = `<div id="pageModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-3xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Page' : 'New Page'}</h3><input type="hidden" id="page_id" value="${page.ID}"><input id="page_title" placeholder="Title" value="${escapeHtml(page.Title)}" class="w-full border p-3 rounded mb-3"><input id="page_slug" placeholder="Slug (URL)" value="${escapeHtml(page.Slug)}" class="w-full border p-3 rounded mb-3"><select id="page_parent" class="w-full border p-3 rounded mb-3">${parentOptions}</select><input id="page_order" type="number" placeholder="Menu Order" value="${page.MenuOrder}" class="w-full border p-3 rounded mb-3"><select id="page_status" class="w-full border p-3 rounded mb-3"><option value="published" ${page.Status==='published'?'selected':''}>Published</option><option value="draft" ${page.Status==='draft'?'selected':''}>Draft</option></select><textarea id="page_content" rows="8" class="w-full border p-3 rounded mb-4" placeholder="HTML content">${escapeHtml(page.Content)}</textarea><div class="flex gap-3"><button onclick="submitPage()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('pageModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+        };
+        window.submitPage = async () => {
+            const data = { id: document.getElementById('page_id').value, title: document.getElementById('page_title').value, slug: document.getElementById('page_slug').value, parentId: document.getElementById('page_parent').value, menuOrder: document.getElementById('page_order').value, status: document.getElementById('page_status').value, content: document.getElementById('page_content').value };
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'savePage', data }) });
+            location.reload();
+        };
+        window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
+
+        // Products (full SEO + image upload)
+        window.openProductModal = (id=null) => {
+            const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
+            const catOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category===c.ID?'selected':''}>${escapeHtml(c.Name)}</option>`).join('');
+            const modalHtml = `<div id="productModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto"><div class="bg-white w-full max-w-5xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Product' : 'New Product'}</h3><input type="hidden" id="prod_id" value="${prod.ID}"><div class="grid md:grid-cols-2 gap-4"><div><label>Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border p-2 rounded mb-2"><label>Category</label><select id="prod_cat" class="w-full border p-2 rounded mb-2">${catOptions}</select><label>Thumbnail URL</label><input id="prod_thumb" value="${escapeHtml(prod.Thumbnail)}" class="w-full border p-2 rounded mb-2"><div class="flex gap-2 mb-2"><input type="file" id="thumbUpload" accept="image/*" class="text-sm"><button onclick="uploadImageToDrive('thumbUpload','prod_thumb')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><label>Images (comma URLs)</label><textarea id="prod_images" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Images)}</textarea><label>Summary</label><textarea id="prod_summary" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Summary)}</textarea><label>Description</label><textarea id="prod_desc" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Description)}</textarea></div><div><label>Technical Info</label><textarea id="prod_tech" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Technical_Info)}</textarea><label>Terms</label><textarea id="prod_terms" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Terms)}</textarea><label>Privacy</label><textarea id="prod_privacy" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Privacy)}</textarea><label>Service Commitment</label><textarea id="prod_service" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.ServiceCommitment)}</textarea><hr class="my-2"><label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle)}" class="w-full border p-2 rounded mb-2"><label>SEO Description</label><textarea id="prod_seod" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.SEODesc)}</textarea><label>SEO Keywords</label><input id="prod_seok" value="${escapeHtml(prod.SEOKeywords)}" class="w-full border p-2 rounded mb-2"><label>OG Title</label><input id="prod_ogtitle" value="${escapeHtml(prod.OGTitle)}" class="w-full border p-2 rounded mb-2"><label>OG Description</label><textarea id="prod_ogdesc" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.OGDesc)}</textarea><label>OG Image</label><input id="prod_ogimage" value="${escapeHtml(prod.OGImage)}" class="w-full border p-2 rounded mb-2"><label>Twitter Card</label><input id="prod_twcard" value="${escapeHtml(prod.TwitterCard)}" class="w-full border p-2 rounded mb-2"></div></div><div class="flex gap-3 mt-6"><button onclick="submitProduct()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('productModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        };
+        window.submitProduct = async () => {
+            const data = { id: document.getElementById('prod_id').value, catId: document.getElementById('prod_cat').value, title: document.getElementById('prod_title').value, thumb: document.getElementById('prod_thumb').value, imgs: document.getElementById('prod_images').value, summary: document.getElementById('prod_summary').value, desc: document.getElementById('prod_desc').value, tech: document.getElementById('prod_tech').value, terms: document.getElementById('prod_terms').value, privacy: document.getElementById('prod_privacy').value, serviceCommitment: document.getElementById('prod_service').value, seoT: document.getElementById('prod_seot').value, seoD: document.getElementById('prod_seod').value, seoK: document.getElementById('prod_seok').value, ogTitle: document.getElementById('prod_ogtitle').value, ogDesc: document.getElementById('prod_ogdesc').value, ogImage: document.getElementById('prod_ogimage').value, twCard: document.getElementById('prod_twcard').value };
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveProduct', data }) });
+            location.reload();
+        };
+        window.deleteProductItem = async (id) => { if(confirm('Delete product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
+
+        window.closeModal = (id) => { const el = document.getElementById(id); if (el) el.remove(); };
     </script>
 </body>
 </html>
