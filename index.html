@@ -46,7 +46,7 @@
     <footer id="siteFooter" class="border-t mt-12 py-12 bg-white"></footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbzYW-R3lnLlggQJi7UM0DurOMTyEwEy893ekADJnB5Fa0FNzw6EmMLye3AphYQp4fEq/exec"; // REPLACE
+        const API_URL = "https://script.google.com/macros/s/AKfycbzYW-R3lnLlggQJi7UM0DurOMTyEwEy893ekADJnB5Fa0FNzw6EmMLye3AphYQp4fEq/exec"; // REPLACE WITH YOUR DEPLOYED URL
         let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [], footer: [] };
         let activeCategoryFilter = "all";
         let currentAdminTab = "site";
@@ -67,7 +67,6 @@
                 store = json.data;
                 if (store.contentBlocks) {
                     store.contentBlocks = store.contentBlocks.map(block => {
-                        // Sheet uses "Content" column, map to "Settings"
                         if (block.Content !== undefined && block.Settings === undefined) {
                             block.Settings = block.Content;
                         }
@@ -167,16 +166,32 @@
             reader.readAsDataURL(file);
         }
 
-        // ======================== HOME PAGE BLOCK RENDERING ========================
+        // ======================== HOME PAGE BLOCK RENDERING (FIXED) ========================
         function renderBlocks(blocks, container) {
             const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
             for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
                 try {
-                    let settings = {};
-                    if (block.Settings) {
-                        if (typeof block.Settings === 'string') settings = JSON.parse(block.Settings);
-                        else settings = block.Settings;
+                    let settings = null;
+                    // Parse settings based on block type
+                    if (block.Type === 'rich_text') {
+                        // Rich text stores raw HTML string, not JSON
+                        settings = block.Settings;
+                    } else if (block.Type === 'hero_image' || block.Type === 'carousel') {
+                        // These types store JSON string
+                        if (block.Settings) {
+                            if (typeof block.Settings === 'string') {
+                                settings = JSON.parse(block.Settings);
+                            } else {
+                                settings = block.Settings;
+                            }
+                        } else {
+                            settings = {};
+                        }
+                    } else {
+                        // For other types (company_name, tagline, etc.) no settings needed
+                        settings = {};
                     }
+
                     if (block.Type === 'hero_image') {
                         const imageUrl = settings.image && settings.image.trim() !== '' ? settings.image : 'https://images.unsplash.com/photo-1497215728101-856f4ea42174';
                         container.innerHTML += `
@@ -208,7 +223,9 @@
                         `).join('');
                         container.innerHTML += `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">${productsHtml}</div>`;
                     } else if (block.Type === 'custom_html' || block.Type === 'rich_text') {
-                        container.innerHTML += `<div class="mb-12 prose max-w-none">${settings}</div>`;
+                        // For rich_text, settings is the raw HTML string
+                        const content = (block.Type === 'rich_text') ? (settings || '') : (typeof settings === 'string' ? settings : JSON.stringify(settings));
+                        container.innerHTML += `<div class="mb-12 prose max-w-none">${content}</div>`;
                     }
                 } catch(e) { console.error('Block render error:', block, e); }
             }
@@ -373,12 +390,23 @@
             fetchData();
         }
 
-        // ======================== BLOCK MODAL ========================
+        // ======================== BLOCK MODAL (FIXED) ========================
         window.openBlockModal = (id=null) => {
             const block = id ? store.contentBlocks.find(b => b.BlockID == id) : null;
             if (!block) return;
-            let settings = {};
-            try { settings = JSON.parse(block.Settings); } catch(e) { settings = {}; }
+            let settings = null;
+            // Parse settings based on block type
+            if (block.Type === 'rich_text') {
+                settings = block.Settings; // raw HTML string
+            } else {
+                try {
+                    if (block.Settings) {
+                        settings = typeof block.Settings === 'string' ? JSON.parse(block.Settings) : block.Settings;
+                    } else {
+                        settings = {};
+                    }
+                } catch(e) { settings = {}; }
+            }
             const modal = document.createElement('div'); modal.id = 'blockModal'; modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
             modal.innerHTML = `<div class="bg-white w-full max-w-3xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">Edit Block: ${escapeHtml(block.BlockName)}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><div id="dynamicSettings"></div><div class="flex gap-3 mt-6"><button onclick="saveBlockEdit()" class="btn-primary px-6 py-2 rounded">Save Changes</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
             document.body.appendChild(modal);
@@ -426,7 +454,7 @@
                 setTimeout(() => {
                     if (quillEditor) quillEditor = null;
                     quillEditor = new Quill('#richEditor', { theme: 'snow', modules: { toolbar: [['bold','italic','underline','strike'], [{'size': ['small',false,'large','huge']}], [{'color': []}], [{'align': []}], ['link','image'], ['clean']] } });
-                    quillEditor.root.innerHTML = typeof settings === 'string' ? settings : '';
+                    quillEditor.root.innerHTML = settings || '';
                 }, 50);
             } else {
                 container.innerHTML = `<p class="text-slate-500">This block pulls data from Company Info and cannot be edited here.</p>`;
@@ -447,7 +475,7 @@
                 } else {
                     newSettings = settings;
                 }
-                const data = { id: block.BlockID, blockName: block.BlockName, type: block.Type, settings: JSON.stringify(newSettings), order: block.Order, location: block.Location };
+                const data = { id: block.BlockID, blockName: block.BlockName, type: block.Type, settings: (block.Type === 'rich_text') ? newSettings : JSON.stringify(newSettings), order: block.Order, location: block.Location };
                 await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
                 closeModal('blockModal');
                 showToast('Block saved');
@@ -466,7 +494,7 @@
         function renderProductsTable() {
             const container = document.getElementById('productsTable');
             if (!container) return;
-            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></div>`;
+            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th><tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModalEdit('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></div>`;
         }
 
         function renderCategoriesList() {
@@ -532,7 +560,7 @@
         window.deleteBlock = (id) => { showConfirm('Permanently delete this block?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); showToast('Block deleted'); fetchData(); }); };
         window.deleteCategoryItem = (id) => { showConfirm('Permanently delete this category?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); showToast('Category deleted'); fetchData(); }); };
 
-        // Product modal (unchanged)
+        // Product modal
         window.openProductModal = () => openProductModalEdit(null);
         window.openProductModalEdit = (id) => {
             const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
