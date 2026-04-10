@@ -1,4 +1,4 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbwmfa_qitTYgVA4oummscukjX7vXGFZCdbHPgZq7ZLnbffaaVhNbJvrHUVwfPOONufF/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbziF2Gb-NoFEG_9QmU6x0qNf9vFd5Ikq08PdpAOiTtPwtpS-HnnLBYi8b41xRtqDElS/exec';
 
 const loginForm = document.getElementById('loginForm');
 const dashboard = document.getElementById('dashboard');
@@ -47,7 +47,7 @@ async function authenticateUser(username, password) {
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ username, password })
         });
         return await response.json();
