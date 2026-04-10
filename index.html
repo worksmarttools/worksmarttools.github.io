@@ -38,7 +38,7 @@
     <footer id="siteFooter" class="border-t mt-12 py-12 bg-white"></footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbziyBdgQpt2cb9VNZHW1QJ9dPVMEM1UFURP_eHhhAtvOvNAaF-VOKdYA1BOTgFV2klW/exec"; // REPLACE WITH YOUR DEPLOYED URL
+        const API_URL = "https://script.google.com/macros/s/AKfycbwAtLoYZhvhKpAntBBDHXK_l8OCBKkwJTtJkBs14iFeI6VoOSIAdHVpj2fhYAlb890/exec"; // REPLACE WITH YOUR DEPLOYED URL
         let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [], footer: [] };
         let activeCategoryFilter = "all";
 
@@ -91,25 +91,48 @@
             document.getElementById('siteFooter').innerHTML = `<div class="container mx-auto px-4 text-center"><p class="font-black text-lg mb-4 uppercase tracking-[0.3em]">${document.getElementById('siteName').innerText}</p><p class="text-slate-400 font-medium text-sm">${escapeHtml(f.copyright_text || '© 2025 ALL RIGHTS RESERVED')}</p></div>`;
         }
 
+        // FIXED: SEO logic - global SEO only affects meta description/keywords, not page title
         function injectSeoMetaTags() {
-            const s = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
+            const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
             const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
             const hash = window.location.hash;
-            let title = s.default_title || company.site_title || "WorkSmart";
-            let description = s.default_description || company.company_moto || "";
+            
+            let pageTitle = company.site_title || "WorkSmart";
+            let metaDescription = seo.default_description || company.company_moto || "";
+            let metaKeywords = seo.default_keywords || "";
+            let ogImage = seo.default_og_image || "";
+            
             if (hash.startsWith('#/product/')) {
                 const prod = store.products.find(p => p.ID === hash.split('/')[2]);
-                if (prod) { title = prod.SEOTitle || prod.Title; description = prod.SEODesc || prod.Summary; }
+                if (prod) {
+                    // SEO Title: use product's SEOTitle, fallback to product Title
+                    pageTitle = prod.SEOTitle && prod.SEOTitle.trim() ? prod.SEOTitle : prod.Title;
+                    // SEO Description: use product's SEODesc, fallback to product Summary, then Description
+                    metaDescription = prod.SEODesc && prod.SEODesc.trim() ? prod.SEODesc : (prod.Summary || prod.Description || "").substring(0, 160);
+                    metaKeywords = prod.SEOKeywords || "";
+                    ogImage = prod.OGImage || prod.Thumbnail || seo.default_og_image;
+                }
             } else if (hash.startsWith('#/page/')) {
                 const page = store.pages.find(p => p.Slug === hash.split('/')[2]);
-                if (page) { title = page.Title; description = page.Content.replace(/<[^>]*>/g, '').substring(0, 160); }
+                if (page) {
+                    pageTitle = page.Title;
+                    metaDescription = page.Content.replace(/<[^>]*>/g, '').substring(0, 160);
+                }
+            } else {
+                // Homepage: use site title from company info, meta description from global SEO
+                pageTitle = company.site_title || "WorkSmart";
             }
-            document.title = title;
-            setMetaTag('description', description);
-            setMetaTag('og:title', title);
-            setMetaTag('og:description', description);
+            
+            document.title = pageTitle;
+            setMetaTag('description', metaDescription);
+            if (metaKeywords) setMetaTag('keywords', metaKeywords);
+            setMetaTag('og:title', pageTitle);
+            setMetaTag('og:description', metaDescription);
+            setMetaTag('og:image', ogImage);
             setMetaTag('twitter:card', 'summary_large_image');
+            if (seo.twitter_handle) setMetaTag('twitter:site', seo.twitter_handle);
         }
+        
         function setMetaTag(name, content) { if(!content) return; let meta = document.querySelector(`meta[name="${name}"]`); if(!meta) { meta = document.createElement('meta'); meta.name = name; document.head.appendChild(meta); } meta.content = content; }
 
         // ======================== IMAGE UPLOAD ========================
@@ -134,7 +157,7 @@
                     if (block.Type === 'hero_image') {
                         container.innerHTML += `
                             <div class="relative h-[500px] rounded-[var(--radius)] overflow-hidden mb-12 flex items-center justify-center text-center text-white">
-                                <img src="${settings.image || 'https://images.unsplash.com/photo-1497215728101-856f4ea42174'}" class="absolute inset-0 w-full h-full object-cover brightness-50">
+                                <img src="${settings.image || 'https://images.unsplash.com/photo-1497215728101-856f4ea42174'}" alt="${settings.alt || 'Hero'}" class="absolute inset-0 w-full h-full object-cover brightness-50">
                                 <div class="relative z-10 p-6 max-w-2xl">
                                     <h1 class="text-5xl md:text-7xl font-black mb-6 leading-tight">${escapeHtml(settings.caption)}</h1>
                                     <p class="text-xl mb-10 opacity-90">${escapeHtml(settings.description)}</p>
@@ -144,7 +167,7 @@
                     } else if (block.Type === 'carousel') {
                         const slides = settings.slides || [];
                         const swiperId = `swiper-${Date.now()}`;
-                        container.innerHTML += `<div class="swiper ${swiperId} rounded-[var(--radius)] mb-12 overflow-hidden"><div class="swiper-wrapper">${slides.map(slide => `<div class="swiper-slide relative"><img src="${slide.image}" class="w-full h-[500px] object-cover"><div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6"><h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2><p class="text-lg mt-2">${escapeHtml(slide.description)}</p></div></div>`).join('')}</div><div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div></div>`;
+                        container.innerHTML += `<div class="swiper ${swiperId} rounded-[var(--radius)] mb-12 overflow-hidden"><div class="swiper-wrapper">${slides.map(slide => `<div class="swiper-slide relative"><img src="${slide.image}" alt="${slide.alt || 'Carousel slide'}" class="w-full h-[500px] object-cover"><div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6"><h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2><p class="text-lg mt-2">${escapeHtml(slide.description)}</p></div></div>`).join('')}</div><div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div></div>`;
                         setTimeout(() => new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, autoplay: settings.autoplay ? { delay: settings.interval || 5000 } : false, loop: slides.length > 1 }), 100);
                     } else if (block.Type === 'custom_html') {
                         container.innerHTML += `<div class="mb-12">${settings}</div>`;
@@ -172,7 +195,7 @@
                 <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     ${filtered.map(p => `
                         <div class="bg-white rounded-[var(--radius)] overflow-hidden shadow-sm border hover:shadow-xl transition-all group cursor-pointer" onclick="location.hash='#/product/${p.ID}'">
-                            <div class="relative h-64 overflow-hidden"><img src="${p.Thumbnail || 'https://placehold.co/600x400'}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"></div>
+                            <div class="relative h-64 overflow-hidden"><img src="${p.Thumbnail || 'https://placehold.co/600x400'}" alt="${escapeHtml(p.Title)}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"></div>
                             <div class="p-6"><h3 class="text-lg font-black group-hover:dynamic-text transition-colors">${escapeHtml(p.Title)}</h3><p class="text-slate-500 text-sm mt-2 line-clamp-2">${escapeHtml(p.Summary)}</p></div>
                         </div>
                     `).join('')}
@@ -184,7 +207,7 @@
             if (!p) return container.innerHTML = 'Product not found';
             container.innerHTML = `
                 <div class="max-w-6xl mx-auto"><button onclick="history.back()" class="mb-6 flex items-center gap-2 text-slate-500 font-bold hover:text-black">← BACK TO LIST</button>
-                <div class="grid lg:grid-cols-2 gap-12 items-start"><div class="sticky top-24"><img src="${p.Thumbnail}" class="w-full rounded-[var(--radius)] shadow-2xl"></div>
+                <div class="grid lg:grid-cols-2 gap-12 items-start"><div class="sticky top-24"><img src="${p.Thumbnail}" alt="${escapeHtml(p.Title)}" class="w-full rounded-[var(--radius)] shadow-2xl"></div>
                 <div><span class="text-xs font-black dynamic-text tracking-[0.2em] uppercase mb-2 block">Product Details</span><h1 class="text-5xl font-black mb-6 leading-tight">${escapeHtml(p.Title)}</h1><p class="text-xl text-slate-600 mb-8 leading-relaxed">${escapeHtml(p.Summary)}</p>
                 <div class="space-y-8"><div class="bg-white p-8 rounded-[var(--radius)] border shadow-sm"><h3 class="text-sm font-black uppercase tracking-widest mb-4">Technical Specifications</h3><div class="text-slate-600 leading-relaxed whitespace-pre-line">${escapeHtml(p.TechInfo || 'Standard specifications apply.')}</div></div>
                 <div class="prose max-w-none text-slate-700"><h3 class="text-xl font-black mb-4">Description</h3>${p.Description}</div></div></div></div></div>`;
@@ -236,7 +259,7 @@
                 renderCategoriesList();
             } else if (tab === 'seo') {
                 const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `<div class="bg-slate-50 p-6 rounded-2xl space-y-3"><h3 class="font-black text-xl">Global SEO Defaults</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><div class="flex gap-2"><input type="file" id="ogImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('ogImageUpload'),'seo_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload OG Image</button></div><input id="seo_ogimage" placeholder="OG Image URL" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded mt-4">Save SEO</button></div>`;
+                div.innerHTML = `<div class="bg-slate-50 p-6 rounded-2xl space-y-3"><h3 class="font-black text-xl">Global SEO Defaults</h3><input id="seo_title" placeholder="Default Title (NOT used for page title, only for meta if needed)" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Meta Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Meta Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><div class="flex gap-2"><input type="file" id="ogImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('ogImageUpload'),'seo_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload OG Image</button></div><input id="seo_ogimage" placeholder="OG Image URL" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded mt-4">Save SEO</button></div>`;
             } else if (tab === 'footer') {
                 const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
                 div.innerHTML = `<div class="bg-slate-50 p-6 rounded-2xl space-y-3"><h3 class="font-black text-xl">Footer Settings</h3><input id="footer_copyright" placeholder="Copyright Text" value="${escapeHtml(footer.copyright_text||'')}" class="w-full border p-2 rounded"><textarea id="footer_links" placeholder='Links JSON: [{"text":"Home","url":"/"}]' rows="3" class="w-full border p-2 rounded">${escapeHtml(footer.footer_links||'[]')}</textarea><textarea id="footer_html" placeholder="Custom HTML (overrides above)" rows="4" class="w-full border p-2 rounded">${escapeHtml(footer.footer_html||'')}</textarea><button onclick="saveFooter()" class="btn-primary px-4 py-2 rounded mt-4">Save Footer</button></div>`;
@@ -276,8 +299,12 @@
         window.saveSeo = async () => { const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_keywords: document.getElementById('seo_keywords')?.value, default_og_image: document.getElementById('seo_ogimage')?.value, twitter_handle: document.getElementById('seo_twitter')?.value }; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSeoDefaults', data }) }); location.reload(); };
         window.saveFooter = async () => { const data = { copyright_text: document.getElementById('footer_copyright')?.value, footer_links: document.getElementById('footer_links')?.value, footer_html: document.getElementById('footer_html')?.value }; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateFooter', data }) }); location.reload(); };
         window.addCategory = async () => { const name = document.getElementById('newCatName')?.value; if(!name) return; await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveCategory', data:{ name } }) }); location.reload(); };
-        window.deleteCategoryItem = async (id) => { if(confirm('Delete category?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); location.reload(); } };
+        
+        // Global delete functions (fixed)
         window.deleteProductItem = async (id) => { if(confirm('Delete product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
+        window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
+        window.deleteBlock = async (id) => { if(confirm('Delete block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
+        window.deleteCategoryItem = async (id) => { if(confirm('Delete category?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); location.reload(); } };
 
         // ======================== PRODUCT MODAL (EDIT & CREATE) ========================
         window.openProductModal = () => openProductModalEdit(null);
@@ -356,7 +383,6 @@
             };
         };
         window.editBlock = (id) => openBlockModal(id);
-        window.deleteBlock = async (id) => { if(confirm('Delete block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
 
         // ======================== PAGE MODAL ========================
         window.openPageModal = (id=null) => {
@@ -372,7 +398,6 @@
             };
         };
         window.editPage = (id) => openPageModal(id);
-        window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
 
         window.closeModal = (id) => { const el = document.getElementById(id); if(el) el.remove(); };
         window.filterCat = (id) => { activeCategoryFilter = id; router(); };
