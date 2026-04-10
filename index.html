@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap" rel="stylesheet">
-    <!-- Include Quill.js for rich text editor -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <style>
@@ -23,6 +22,9 @@
         .confirm-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .confirm-box { background: white; border-radius: 1.5rem; padding: 2rem; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.3); }
         .ql-container { min-height: 200px; }
+        .toast { position: fixed; bottom: 30px; right: 30px; background: #10b981; color: white; padding: 12px 24px; border-radius: 50px; font-weight: bold; z-index: 10000; animation: fadeInOut 3s ease forwards; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .toast.error { background: #ef4444; }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translateY(20px); } 10% { opacity: 1; transform: translateY(0); } 90% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(20px); visibility: hidden; } }
     </style>
 </head>
 <body>
@@ -44,13 +46,20 @@
     <footer id="siteFooter" class="border-t mt-12 py-12 bg-white"></footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbzYW-R3lnLlggQJi7UM0DurOMTyEwEy893ekADJnB5Fa0FNzw6EmMLye3AphYQp4fEq/exec"; // REPLACE WITH YOUR DEPLOYED URL
+        const API_URL = "https://script.google.com/macros/s/AKfycbzYW-R3lnLlggQJi7UM0DurOMTyEwEy893ekADJnB5Fa0FNzw6EmMLye3AphYQp4fEq/exec"; // REPLACE
         let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [], footer: [] };
         let activeCategoryFilter = "all";
         let currentAdminTab = "site";
         let quillEditor = null;
 
-        // ======================== CORE ========================
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${isError ? 'error' : ''}`;
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
         async function fetchData() {
             try {
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
@@ -58,7 +67,10 @@
                 store = json.data;
                 if (store.contentBlocks) {
                     store.contentBlocks = store.contentBlocks.map(block => {
-                        if (block.Content !== undefined && block.Settings === undefined) block.Settings = block.Content;
+                        // Sheet uses "Content" column, map to "Settings"
+                        if (block.Content !== undefined && block.Settings === undefined) {
+                            block.Settings = block.Content;
+                        }
                         return block;
                     });
                 }
@@ -67,7 +79,7 @@
                 renderFooter();
                 injectSeoMetaTags();
                 router();
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error(e); showToast('Failed to load data', true); }
         }
 
         function applyTheme() {
@@ -149,8 +161,8 @@
                 const json = await res.json();
                 if (json.status === 'success') { 
                     document.getElementById(targetFieldId).value = json.url; 
-                    alert('Image uploaded!');
-                } else alert('Error: ' + json.message);
+                    showToast('Image uploaded!');
+                } else showToast('Upload failed', true);
             };
             reader.readAsDataURL(file);
         }
@@ -195,9 +207,7 @@
                             </div>
                         `).join('');
                         container.innerHTML += `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">${productsHtml}</div>`;
-                    } else if (block.Type === 'custom_html') {
-                        container.innerHTML += `<div class="mb-12 prose max-w-none">${settings}</div>`;
-                    } else if (block.Type === 'rich_text') {
+                    } else if (block.Type === 'custom_html' || block.Type === 'rich_text') {
                         container.innerHTML += `<div class="mb-12 prose max-w-none">${settings}</div>`;
                     }
                 } catch(e) { console.error('Block render error:', block, e); }
@@ -321,13 +331,12 @@
             if (index === -1) return;
             const newIndex = direction === 'up' ? index - 1 : index + 1;
             if (newIndex < 0 || newIndex >= blocks.length) return;
-            // Swap orders
             const tempOrder = blocks[index].Order;
             blocks[index].Order = blocks[newIndex].Order;
             blocks[newIndex].Order = tempOrder;
-            // Save all orders
             const updateData = blocks.map(b => ({ id: b.BlockID, order: b.Order }));
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'reorderBlocks', data: { blocks: updateData } }) });
+            showToast('Blocks reordered');
             fetchData();
         }
 
@@ -360,15 +369,16 @@
             const maxOrder = Math.max(0, ...(store.contentBlocks || []).map(b => b.Order || 0));
             const data = { id: '', blockName, type, settings: JSON.stringify(settings), order: maxOrder + 1, location: 'homepage' };
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
+            showToast('Block added');
             fetchData();
         }
 
-        // ======================== BLOCK MODAL (with rich text editor for custom blocks) ========================
+        // ======================== BLOCK MODAL ========================
         window.openBlockModal = (id=null) => {
             const block = id ? store.contentBlocks.find(b => b.BlockID == id) : null;
             if (!block) return;
             let settings = {};
-            try { settings = JSON.parse(block.Settings); } catch(e) {}
+            try { settings = JSON.parse(block.Settings); } catch(e) { settings = {}; }
             const modal = document.createElement('div'); modal.id = 'blockModal'; modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
             modal.innerHTML = `<div class="bg-white w-full max-w-3xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">Edit Block: ${escapeHtml(block.BlockName)}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><div id="dynamicSettings"></div><div class="flex gap-3 mt-6"><button onclick="saveBlockEdit()" class="btn-primary px-6 py-2 rounded">Save Changes</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
             document.body.appendChild(modal);
@@ -414,11 +424,11 @@
                 const editorDiv = document.createElement('div'); editorDiv.id = 'richEditor'; editorDiv.style.height = '300px';
                 container.appendChild(editorDiv);
                 setTimeout(() => {
+                    if (quillEditor) quillEditor = null;
                     quillEditor = new Quill('#richEditor', { theme: 'snow', modules: { toolbar: [['bold','italic','underline','strike'], [{'size': ['small',false,'large','huge']}], [{'color': []}], [{'align': []}], ['link','image'], ['clean']] } });
-                    quillEditor.root.innerHTML = settings;
+                    quillEditor.root.innerHTML = typeof settings === 'string' ? settings : '';
                 }, 50);
             } else {
-                // For other types, no editable settings (they pull from company data)
                 container.innerHTML = `<p class="text-slate-500">This block pulls data from Company Info and cannot be edited here.</p>`;
             }
             window.saveBlockEdit = async () => {
@@ -439,12 +449,14 @@
                 }
                 const data = { id: block.BlockID, blockName: block.BlockName, type: block.Type, settings: JSON.stringify(newSettings), order: block.Order, location: block.Location };
                 await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
+                closeModal('blockModal');
+                showToast('Block saved');
                 fetchData();
             };
         };
         window.editBlock = (id) => openBlockModal(id);
 
-        // ======================== OTHER CRUD FUNCTIONS (unchanged) ========================
+        // ======================== OTHER CRUD FUNCTIONS ========================
         function renderPagesList() {
             const container = document.getElementById('pagesList');
             if (!container) return;
@@ -468,30 +480,34 @@
         window.adminLogin = async () => { 
             const res = await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'login', data:{ username:document.getElementById('admUser').value, password:document.getElementById('admPass').value } }) }); 
             const json = await res.json(); 
-            if(json.status==='success') { localStorage.setItem('ws_token',json.token); router(); } else alert('Invalid'); 
+            if(json.status==='success') { localStorage.setItem('ws_token',json.token); router(); showToast('Login successful'); } else showToast('Invalid credentials', true); 
         };
         
         window.saveTheme = async () => { 
             const data = { primary_color: document.getElementById('primary_color')?.value, body_bg: document.getElementById('body_bg')?.value, card_radius: document.getElementById('card_radius')?.value, base_font_size: document.getElementById('base_font_size')?.value, font_family: document.getElementById('font_family')?.value }; 
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateTheme', data }) }); 
+            showToast('Theme saved');
             fetchData(); 
         };
         
         window.saveCompany = async () => { 
             const data = { site_title: document.getElementById('comp_site_title')?.value, company_name: document.getElementById('comp_company_name')?.value, company_moto: document.getElementById('comp_company_moto')?.value, company_desc: document.getElementById('comp_company_desc')?.value, logo_url: document.getElementById('comp_logo_url')?.value }; 
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSettings', data }) }); 
+            showToast('Company info saved');
             fetchData(); 
         };
         
         window.saveSeo = async () => { 
             const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_keywords: document.getElementById('seo_keywords')?.value, default_og_image: document.getElementById('seo_ogimage')?.value, twitter_handle: document.getElementById('seo_twitter')?.value }; 
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSeoDefaults', data }) }); 
+            showToast('SEO defaults saved');
             fetchData(); 
         };
         
         window.saveFooter = async () => { 
             const data = { copyright_text: document.getElementById('footer_copyright')?.value, footer_links: document.getElementById('footer_links')?.value, footer_html: document.getElementById('footer_html')?.value }; 
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateFooter', data }) }); 
+            showToast('Footer saved');
             fetchData(); 
         };
         
@@ -499,10 +515,10 @@
             const name = document.getElementById('newCatName')?.value; 
             if(!name) return; 
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveCategory', data:{ name } }) }); 
+            showToast('Category added');
             fetchData(); 
         };
         
-        // Delete functions with custom confirm
         function showConfirm(message, onConfirm) {
             const overlay = document.createElement('div'); overlay.className = 'confirm-overlay';
             overlay.innerHTML = `<div class="confirm-box"><p class="text-lg font-black mb-6">${escapeHtml(message)}</p><div class="flex gap-4 justify-center"><button class="confirm-yes bg-red-600 text-white px-6 py-2 rounded-full font-bold hover:bg-red-700">Yes, Delete</button><button class="confirm-no bg-slate-200 px-6 py-2 rounded-full font-bold hover:bg-slate-300">Cancel</button></div></div>`;
@@ -511,10 +527,10 @@
             overlay.querySelector('.confirm-no').onclick = () => overlay.remove();
         }
 
-        window.deleteProductItem = (id) => { showConfirm('Permanently delete this product?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); fetchData(); }); };
-        window.deletePageItem = (id) => { showConfirm('Permanently delete this page?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); fetchData(); }); };
-        window.deleteBlock = (id) => { showConfirm('Permanently delete this block?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); fetchData(); }); };
-        window.deleteCategoryItem = (id) => { showConfirm('Permanently delete this category?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); fetchData(); }); };
+        window.deleteProductItem = (id) => { showConfirm('Permanently delete this product?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); showToast('Product deleted'); fetchData(); }); };
+        window.deletePageItem = (id) => { showConfirm('Permanently delete this page?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); showToast('Page deleted'); fetchData(); }); };
+        window.deleteBlock = (id) => { showConfirm('Permanently delete this block?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); showToast('Block deleted'); fetchData(); }); };
+        window.deleteCategoryItem = (id) => { showConfirm('Permanently delete this category?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); showToast('Category deleted'); fetchData(); }); };
 
         // Product modal (unchanged)
         window.openProductModal = () => openProductModalEdit(null);
@@ -527,11 +543,13 @@
             window.submitProduct = async () => {
                 const data = { id: document.getElementById('prod_id').value, catId: document.getElementById('prod_cat').value, title: document.getElementById('prod_title').value, thumb: document.getElementById('prod_thumb').value, imgs: document.getElementById('prod_images').value, summary: document.getElementById('prod_summary').value, desc: document.getElementById('prod_desc').value, tech: document.getElementById('prod_tech').value, terms: document.getElementById('prod_terms').value, privacy: document.getElementById('prod_privacy').value, serviceCommitment: document.getElementById('prod_service').value, seoT: document.getElementById('prod_seot').value, seoD: document.getElementById('prod_seod').value, seoK: document.getElementById('prod_seok').value, ogTitle: document.getElementById('prod_ogtitle').value, ogDesc: document.getElementById('prod_ogdesc').value, ogImage: document.getElementById('prod_ogimage').value, twCard: document.getElementById('prod_twcard').value };
                 await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveProduct', data }) });
+                closeModal('productModal');
+                showToast('Product saved');
                 fetchData();
             };
         };
 
-        // Page modal (unchanged)
+        // Page modal
         window.openPageModal = (id=null) => {
             const page = id ? store.pages.find(p => p.ID == id) : { ID:'', Slug:'', Title:'', Content:'', MenuOrder:0, Status:'published', ParentID:'' };
             const parentOptions = '<option value="">None (Root)</option>' + (store.pages || []).filter(p => p.ID !== page.ID).map(p => `<option value="${p.ID}" ${page.ParentID===p.ID?'selected':''}>${escapeHtml(p.Title)}</option>`).join('');
@@ -541,6 +559,8 @@
             window.submitPage = async () => {
                 const data = { id: document.getElementById('page_id').value, title: document.getElementById('page_title').value, slug: document.getElementById('page_slug').value, parentId: document.getElementById('page_parent').value, menuOrder: document.getElementById('page_order').value, status: document.getElementById('page_status').value, content: document.getElementById('page_content').value };
                 await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'savePage', data }) });
+                closeModal('pageModal');
+                showToast('Page saved');
                 fetchData();
             };
         };
