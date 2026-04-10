@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>WorkSmart CMS | Ultimate Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkSmart CMS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -11,136 +11,111 @@
     <style>
         :root { --primary: #0f172a; --radius: 1rem; --bg: #f8fafc; }
         body { background: var(--bg); font-family: 'Inter', sans-serif; }
-        .card { border-radius: var(--radius); transition: all 0.2s; }
         .btn-primary { background: var(--primary); color: white; border-radius: var(--radius); transition: opacity 0.2s; }
         .btn-primary:hover { opacity: 0.9; }
-        .dynamic-bg { background: var(--primary); }
         .dynamic-text { color: var(--primary); }
         .tab-active { border-bottom: 2px solid var(--primary); color: var(--primary); font-weight: bold; }
-        .modal { transition: opacity 0.2s ease; }
-        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .dropdown:hover .dropdown-menu { display: block; }
     </style>
 </head>
-<body class="bg-slate-50">
-    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur border-b px-6 py-3 flex flex-wrap justify-between items-center gap-4">
-        <span class="text-2xl font-black dynamic-text">WORKSMART CMS</span>
-        <div id="public-nav" class="hidden md:flex gap-6 text-sm font-medium"></div>
-        <a href="#/admin-as" class="text-xs bg-slate-900 text-white px-4 py-2 rounded-full shadow">ADMIN</a>
+<body>
+    <!-- Dynamic Navbar (no admin button for public) -->
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur border-b shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="location.hash='#/'">
+                <img id="siteLogo" src="" class="h-8 hidden">
+                <span id="siteName" class="text-xl font-black dynamic-text">WORKSMART</span>
+            </div>
+            <div id="mainMenu" class="hidden md:flex items-center gap-6"></div>
+        </div>
     </nav>
-    <main id="app" class="container mx-auto px-4 py-8 min-h-screen"></main>
-    <footer class="text-center text-slate-400 text-sm py-8 border-t">© WorkSmart — Dynamic CMS</footer>
+
+    <main id="app" class="container mx-auto px-4 py-6 min-h-screen"></main>
+
+    <footer id="siteFooter" class="text-center py-8 border-t mt-12 text-slate-500 text-sm"></footer>
 
     <script>
-        // ======================== CONFIGURATION ========================
-        const API_URL = "https://script.google.com/macros/s/AKfycbyW4njAVLJwvGveojZsw_ORdxLP14BpluHJv5ZAdGmKmk6lgEOL_KrmHESQYgD6fZOG/exec"; // 🔁 REPLACE WITH YOUR DEPLOYED URL
+        const API_URL = "https://script.google.com/macros/s/AKfycbzpPyRxUGaOgeaodFNDWnM9xB4VKDjR8wZLfGJPQ9SJppfXVstKM_D7tg5lcf-TtMNr/exec"; // 🔁 REPLACE WITH YOUR DEPLOYED URL
         let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [] };
         let activeCategoryFilter = "all";
 
-        // ======================== HELPER FUNCTIONS ========================
         async function fetchData() {
             try {
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
                 const json = await res.json();
-                store = json.data || { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [] };
-                if (!store.categories) store.categories = [];
-                if (!store.pages) store.pages = [];
-                if (!store.contentBlocks) store.contentBlocks = [];
-                if (!store.theme) store.theme = [];
-                if (!store.seoDefaults) store.seoDefaults = [];
+                store = json.data;
                 applyTheme();
-                buildPublicNav();
-                updateMetaTags();
+                buildHierarchicalMenu();
+                renderFooter();
                 router();
-            } catch(e) { console.error("Fetch error", e); }
+            } catch(e) { console.error(e); }
         }
 
         function applyTheme() {
-            const theme = Object.fromEntries((store.theme || []).map(i => [i.Key, i.Value]));
-            document.documentElement.style.setProperty('--primary', theme.primary_color || '#0f172a');
-            document.documentElement.style.setProperty('--radius', (theme.card_radius || 16) + 'px');
-            document.body.style.backgroundColor = theme.body_bg || '#f8fafc';
-            document.body.style.fontSize = (theme.base_font_size || 16) + 'px';
-            if (theme.font_family) document.body.style.fontFamily = theme.font_family;
+            const t = Object.fromEntries((store.theme || []).map(i=>[i.Key,i.Value]));
+            document.documentElement.style.setProperty('--primary', t.primary_color || '#0f172a');
+            document.documentElement.style.setProperty('--radius', (t.card_radius || 16)+'px');
+            document.body.style.backgroundColor = t.body_bg || '#f8fafc';
+            document.body.style.fontSize = (t.base_font_size || 16)+'px';
+            if(t.font_family) document.body.style.fontFamily = t.font_family;
+            const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
+            document.getElementById('siteName').innerText = company.company_name || "WORKSMART";
+            const logo = document.getElementById('siteLogo');
+            if(company.logo_url && company.logo_url.trim()) { logo.src = company.logo_url; logo.classList.remove('hidden'); }
         }
 
-        function buildPublicNav() {
-            const navDiv = document.getElementById('public-nav');
-            if (!navDiv) return;
-            let html = `<a href="#/" class="hover:dynamic-text">HOME</a>`;
-            const pages = (store.pages || []).filter(p => p.Status === 'published').sort((a,b) => (a.MenuOrder||0) - (b.MenuOrder||0));
-            pages.forEach(p => { html += `<a href="#/page/${p.Slug}" class="hover:dynamic-text">${escapeHtml(p.Title)}</a>`; });
-            html += `<a href="#/products" class="hover:dynamic-text">PRODUCTS</a>`;
-            navDiv.innerHTML = html;
-        }
-
-        function updateMetaTags() {
-            const seo = Object.fromEntries((store.seoDefaults || []).map(i => [i.Key, i.Value]));
-            const dict = Object.fromEntries((store.company || []).map(i => [i.Key, i.Value]));
-            const hash = window.location.hash;
-            let title = dict.site_meta_title || dict.site_title || "WorkSmart";
-            let description = dict.site_meta_description || "";
-            if (hash.startsWith('#/product/')) {
-                const prod = store.products.find(p => p.ID === hash.split('/')[2]);
-                if (prod) { title = prod.SEOTitle || prod.Title; description = prod.SEODesc || prod.Summary; }
-            } else if (hash.startsWith('#/page/')) {
-                const page = store.pages.find(p => p.Slug === hash.split('/')[2]);
-                if (page) { title = page.Title; description = page.Content.replace(/<[^>]*>/g, '').slice(0, 160); }
+        function buildHierarchicalMenu() {
+            const pages = (store.pages || []).filter(p => p.Status === 'published');
+            const menuContainer = document.getElementById('mainMenu');
+            if (!menuContainer) return;
+            const tree = [];
+            const map = {};
+            pages.forEach(p => { map[p.ID] = { ...p, children: [] }; });
+            pages.forEach(p => {
+                if (p.ParentID && map[p.ParentID]) map[p.ParentID].children.push(map[p.ID]);
+                else tree.push(map[p.ID]);
+            });
+            function renderTree(items) {
+                let html = '';
+                items.forEach(item => {
+                    const hasChildren = item.children.length > 0;
+                    html += `<div class="relative group">
+                        <a href="#/page/${item.Slug}" class="block px-4 py-2 text-sm font-medium hover:dynamic-text">${escapeHtml(item.Title)}</a>
+                        ${hasChildren ? `<div class="absolute left-0 top-full hidden group-hover:block bg-white shadow-lg rounded-md min-w-40 z-50">${renderTree(item.children)}</div>` : ''}
+                    </div>`;
+                });
+                return html;
             }
-            document.title = title;
-            let meta = document.querySelector('meta[name="description"]');
-            if (!meta) { meta = document.createElement('meta'); meta.name = 'description'; document.head.appendChild(meta); }
-            meta.content = description;
+            let menuHtml = `<a href="#/" class="px-3 py-2 text-sm font-medium hover:dynamic-text">HOME</a>`;
+            menuHtml += renderTree(tree);
+            menuHtml += `<a href="#/products" class="px-3 py-2 text-sm font-medium hover:dynamic-text">PRODUCTS</a>`;
+            menuContainer.innerHTML = menuHtml;
         }
 
-        function getCategoryName(catId) {
-            const cat = store.categories.find(c => c.ID == catId);
-            return cat ? cat.Name : (catId === "general" ? "General" : catId);
+        function renderFooter() {
+            const footerBlock = (store.contentBlocks || []).find(b => b.BlockName === 'footer' && b.Location === 'global');
+            const footerEl = document.getElementById('siteFooter');
+            if (footerBlock) footerEl.innerHTML = footerBlock.Content;
+            else footerEl.innerHTML = '© WorkSmart CMS';
         }
 
-        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
-
-        // ======================== IMAGE UPLOAD TO DRIVE ========================
-        async function uploadImageToDrive(fileInputId, targetInputId) {
-            const fileInput = document.getElementById(fileInputId);
-            if (!fileInput || !fileInput.files.length) { alert("Select a file first"); return; }
-            const formData = new FormData();
-            formData.append('action', 'uploadImage');
-            formData.append('file', fileInput.files[0]);
-            formData.append('filename', fileInput.files[0].name);
-            try {
-                const res = await fetch(API_URL, { method: 'POST', body: formData });
-                const json = await res.json();
-                if (json.status === 'success') {
-                    document.getElementById(targetInputId).value = json.url;
-                    alert("Image uploaded! URL inserted.");
-                } else { alert("Upload failed: " + json.message); }
-            } catch(e) { alert("Upload error"); }
+        function getBlocksByLocation(location) {
+            return (store.contentBlocks || []).filter(b => b.Location === location).sort((a,b)=>a.Order-b.Order);
         }
 
-        // ======================== ROUTER ========================
-        window.addEventListener('hashchange', () => { updateMetaTags(); router(); });
-        window.addEventListener('load', fetchData);
-
-        async function router() {
-            const hash = window.location.hash || '#/';
-            const app = document.getElementById('app');
-            if (hash === '#/') renderHome(app);
-            else if (hash === '#/products') renderProductList(app);
-            else if (hash.startsWith('#/product/')) renderProductDetail(app, hash.split('/')[2]);
-            else if (hash.startsWith('#/page/')) renderPage(app, hash.split('/')[2]);
-            else if (hash === '#/admin-as') renderAdmin(app);
-            else renderHome(app);
-        }
-
-        // ======================== PUBLIC VIEWS ========================
         function renderHome(container) {
-            const blocks = store.contentBlocks || [];
-            const hero = blocks.find(b => b.BlockName === 'hero') || { Content: '<h1 class="text-5xl font-black">Welcome to WorkSmart</h1><p>Powerful CMS</p>' };
-            const features = blocks.find(b => b.BlockName === 'features') || { Content: '<div class="p-6 bg-white rounded-2xl shadow">Feature 1</div><div class="p-6 bg-white rounded-2xl shadow">Feature 2</div><div class="p-6 bg-white rounded-2xl shadow">Feature 3</div>' };
-            container.innerHTML = `
-                <div class="prose max-w-none mb-12">${hero.Content}</div>
-                <div class="grid md:grid-cols-3 gap-8 my-12">${features.Content}</div>
-            `;
+            const blocks = getBlocksByLocation('homepage');
+            if (blocks.length === 0) {
+                container.innerHTML = `<div class="text-center py-20">No content blocks found. Go to Admin → Content Blocks and add blocks with Location = "homepage".</div>`;
+                return;
+            }
+            let html = '';
+            blocks.forEach(block => {
+                if (block.Type === 'html') html += block.Content;
+                else if (block.Type === 'text') html += `<div class="prose max-w-none my-6">${block.Content}</div>`;
+                else if (block.Type === 'image') html += `<img src="${block.Content}" class="w-full rounded-2xl my-6">`;
+            });
+            container.innerHTML = html;
         }
 
         function renderProductList(container) {
@@ -200,86 +175,83 @@
         function renderPage(container, slug) {
             const page = store.pages.find(p => p.Slug === slug);
             if (!page) { container.innerHTML = '<div class="text-center py-20">Page not found</div>'; return; }
-            container.innerHTML = `<div class="max-w-4xl mx-auto prose prose-lg">${page.Content || '<p>No content yet.</p>'}</div>`;
+            container.innerHTML = `<div class="max-w-4xl mx-auto prose prose-lg">${page.Content || '<p>No content.</p>'}</div>`;
         }
 
-        // ======================== ADMIN PANEL (TABBED, FULL CONTROL) ========================
+        function getCategoryName(catId) {
+            const cat = store.categories.find(c => c.ID == catId);
+            return cat ? cat.Name : (catId === "general" ? "General" : catId);
+        }
+
+        // ======================== ADMIN PANEL ========================
         function renderAdmin(container) {
             const token = localStorage.getItem('ws_token');
             if (!token) {
-                container.innerHTML = `<div class="max-w-md mx-auto bg-white p-10 rounded-2xl shadow-lg mt-12"><h2 class="text-2xl font-black mb-6">Admin Login</h2><input id="admUser" class="w-full border p-3 rounded-lg mb-4" placeholder="Username"><input id="admPass" type="password" class="w-full border p-3 rounded-lg mb-6" placeholder="Password"><button onclick="adminLogin()" class="btn-primary w-full py-3 rounded-lg font-bold">LOGIN</button></div>`;
+                container.innerHTML = `<div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow mt-12"><h2 class="text-2xl font-black mb-4">Admin Login</h2><input id="admUser" class="w-full border p-3 rounded mb-3" placeholder="Username"><input id="admPass" type="password" class="w-full border p-3 rounded mb-5" placeholder="Password"><button onclick="adminLogin()" class="btn-primary w-full py-3 rounded">Login</button></div>`;
                 return;
             }
             container.innerHTML = `
-                <div class="flex justify-between items-center flex-wrap gap-4 mb-8"><h1 class="text-3xl font-black">⚡ Admin Console</h1><button onclick="adminLogout()" class="text-red-500 border border-red-300 px-5 py-2 rounded-full text-sm">Logout</button></div>
-                <div class="flex flex-wrap gap-1 border-b mb-6">
-                    <button data-tab="site" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">🎨 Site & Theme</button>
-                    <button data-tab="blocks" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">🧩 Content Blocks</button>
-                    <button data-tab="pages" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">📄 Pages (Menu)</button>
-                    <button data-tab="products" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">📦 Products</button>
-                    <button data-tab="seo" class="tab-btn px-5 py-2 text-sm font-semibold rounded-t-lg">🔍 SEO Global</button>
+                <div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-black">Admin Console</h1><button onclick="adminLogout()" class="text-red-500 border px-4 py-1 rounded-full text-sm">Logout</button></div>
+                <div class="flex flex-wrap gap-2 border-b mb-6">
+                    <button data-tab="site" class="tab-btn px-4 py-2">Site & Theme</button>
+                    <button data-tab="blocks" class="tab-btn px-4 py-2">Content Blocks</button>
+                    <button data-tab="pages" class="tab-btn px-4 py-2">Pages (Menu)</button>
+                    <button data-tab="products" class="tab-btn px-4 py-2">Products</button>
+                    <button data-tab="seo" class="tab-btn px-4 py-2">SEO</button>
                 </div>
-                <div id="tab-content"></div>
+                <div id="tabContent"></div>
             `;
-            document.querySelectorAll('.tab-btn').forEach(btn => { btn.onclick = () => loadTab(btn.getAttribute('data-tab')); });
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.onclick = () => loadTab(btn.innerText.toLowerCase().includes('site')?'site':btn.innerText.toLowerCase().includes('blocks')?'blocks':btn.innerText.toLowerCase().includes('pages')?'pages':btn.innerText.toLowerCase().includes('products')?'products':'seo'));
             loadTab('site');
         }
 
         async function loadTab(tab) {
-            const div = document.getElementById('tab-content');
+            const div = document.getElementById('tabContent');
             if (!div) return;
             if (tab === 'site') {
-                const theme = Object.fromEntries((store.theme || []).map(i => [i.Key, i.Value]));
-                const company = Object.fromEntries((store.company || []).map(i => [i.Key, i.Value]));
+                const theme = Object.fromEntries((store.theme || []).map(i=>[i.Key,i.Value]));
+                const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
                 div.innerHTML = `
-                    <div class="bg-white p-6 rounded-2xl shadow-md space-y-4">
-                        <h3 class="font-black text-xl">Theme & Design</h3>
-                        <div class="grid md:grid-cols-2 gap-4">
-                            <label>Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color || '#0f172a'}" class="border rounded h-10"><label>Body Background</label><input type="color" id="body_bg" value="${theme.body_bg || '#f8fafc'}" class="border rounded h-10"><label>Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius || 16}" class="border rounded p-2"><label>Base Font (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size || 16}" class="border rounded p-2"><label>Font Family</label><input id="font_family" value="${theme.font_family || 'Inter'}" class="border rounded p-2"></div>
-                        <button onclick="saveTheme()" class="btn-primary px-6 py-2 rounded-lg">Save Theme</button>
-                    </div>
-                    <div class="bg-white p-6 rounded-2xl shadow-md mt-6 space-y-3">
-                        <h3 class="font-black">Company Info</h3>
-                        <div class="grid md:grid-cols-2 gap-3">${Object.entries(company).map(([k,v]) => `<div><label class="text-xs">${k}</label><input id="comp_${k}" value="${escapeHtml(v)}" class="w-full border p-2 rounded"></div>`).join('')}</div>
-                        <button onclick="saveCompanyInfo()" class="btn-primary px-6 py-2 rounded-lg">Save Company</button>
-                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow space-y-4"><h3 class="font-black">Theme</h3><div class="grid md:grid-cols-2 gap-3"><label>Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color||'#0f172a'}"><label>Body BG</label><input type="color" id="body_bg" value="${theme.body_bg||'#f8fafc'}"><label>Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius||16}"><label>Base Font (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size||16}"><label>Font Family</label><input id="font_family" value="${theme.font_family||'Inter'}"></div><button onclick="saveTheme()" class="btn-primary px-4 py-2 rounded">Save Theme</button></div>
+                    <div class="bg-white p-6 rounded-2xl shadow mt-6"><h3 class="font-black">Company Info</h3><div class="grid md:grid-cols-2 gap-3">${Object.entries(company).map(([k,v])=>`<div><label>${k}</label><input id="comp_${k}" value="${escapeHtml(v)}" class="w-full border p-2 rounded"></div>`).join('')}</div><button onclick="saveCompanyInfo()" class="btn-primary px-4 py-2 rounded mt-4">Save Company</button></div>
                 `;
             } else if (tab === 'blocks') {
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="blocksList"></div><button onclick="newContentBlock()" class="btn-primary px-4 py-2 rounded-lg mt-4">+ Add Block</button></div>`;
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="blocksList"></div><button onclick="openBlockModal()" class="btn-primary px-4 py-2 rounded mt-4">+ Add Block</button></div>`;
                 renderBlocksList();
             } else if (tab === 'pages') {
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="pagesList"></div><button onclick="openPageModal()" class="btn-primary px-4 py-2 rounded-lg mt-4">+ New Page</button></div>`;
-                renderPagesHierarchy();
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="pagesList"></div><button onclick="openPageModal()" class="btn-primary px-4 py-2 rounded mt-4">+ New Page</button></div>`;
+                renderPagesList();
             } else if (tab === 'products') {
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><button onclick="openProductModal()" class="bg-emerald-600 text-white px-5 py-2 rounded-lg mb-4">+ New Product</button><div id="productsTable"></div></div>`;
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><button onclick="openProductModal()" class="bg-emerald-600 text-white px-4 py-2 rounded mb-4">+ New Product</button><div id="productsTable"></div></div>`;
                 renderProductsTable();
             } else if (tab === 'seo') {
-                const seo = Object.fromEntries((store.seoDefaults || []).map(i => [i.Key, i.Value]));
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO Defaults</h3><div class="grid md:grid-cols-2 gap-3"><label>Default Title</label><input id="seo_title" value="${seo.default_title || ''}" class="border p-2 rounded"><label>Default Description</label><textarea id="seo_desc" class="border p-2 rounded">${seo.default_description || ''}</textarea><label>Default OG Image</label><input id="seo_ogimage" value="${seo.default_og_image || ''}" class="border p-2 rounded"><label>Twitter Handle</label><input id="seo_twitter" value="${seo.twitter_handle || ''}" class="border p-2 rounded"></div><button onclick="saveSeoDefaults()" class="btn-primary px-6 py-2 rounded-lg">Save SEO</button></div>`;
+                const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_ogimage" placeholder="Default OG Image" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded">Save SEO</button></div>`;
             }
         }
 
         function renderBlocksList() {
+            const blocks = store.contentBlocks || [];
             const container = document.getElementById('blocksList');
             if (!container) return;
-            container.innerHTML = (store.contentBlocks || []).map(b => `
-                <div class="border-b py-3 flex justify-between items-start"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type})<br><div class="text-xs text-slate-500">${escapeHtml(b.Content?.substring(0,80))}...</div></div><div><button onclick="editContentBlock('${b.BlockID}')" class="text-blue-500 text-xs mr-2">Edit</button><button onclick="deleteContentBlock('${b.BlockID}')" class="text-red-500 text-xs">Delete</button></div></div>
+            container.innerHTML = blocks.map(b => `
+                <div class="border-b py-3 flex justify-between"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type} | ${b.Location})<br><div class="text-xs text-slate-500">${escapeHtml(b.Content?.substring(0,80))}...</div></div><div><button onclick="editBlock('${b.BlockID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteBlock('${b.BlockID}')" class="text-red-500">Delete</button></div></div>
             `).join('');
         }
 
-        function renderPagesHierarchy() {
+        function renderPagesList() {
             const pages = store.pages || [];
             const container = document.getElementById('pagesList');
             if (!container) return;
-            container.innerHTML = pages.map(page => `
-                <div class="border-b py-3 flex justify-between items-center"><div><span class="font-bold">${escapeHtml(page.Title)}</span> <span class="text-xs text-slate-400">/${page.Slug}</span> ${page.ParentID ? `<span class="text-xs bg-slate-100 px-2 ml-2">child</span>` : ''}</div><div><button onclick="openPageModal('${page.ID}')" class="text-blue-500 text-xs mr-2">Edit</button><button onclick="deletePageItem('${page.ID}')" class="text-red-500 text-xs">Delete</button></div></div>
+            container.innerHTML = pages.map(p => `
+                <div class="border-b py-3 flex justify-between"><div><b>${escapeHtml(p.Title)}</b> /${p.Slug} ${p.ParentID ? '(child)' : ''}</div><div><button onclick="editPage('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deletePage('${p.ID}')" class="text-red-500">Delete</button></div></div>
             `).join('');
         }
 
         function renderProductsTable() {
             const container = document.getElementById('productsTable');
             if (!container) return;
-            container.innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModal('${p.ID}')" class="text-blue-500 text-xs mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500 text-xs">Delete</button></td></tr>`).join('')}</tbody></table>`;
+            container.innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModal('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></table>`;
         }
 
         // ======================== CRUD ACTIONS ========================
@@ -300,26 +272,25 @@
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSettings', data }) });
             location.reload();
         };
-        window.saveSeoDefaults = async () => {
-            const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_og_image: document.getElementById('seo_ogimage')?.value, twitter_handle: document.getElementById('seo_twitter')?.value };
+        window.saveSeo = async () => {
+            const data = { default_title: document.getElementById('seo_title')?.value, default_description: document.getElementById('seo_desc')?.value, default_og_image: document.getElementById('seo_ogimage')?.value };
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSeoDefaults', data }) });
             location.reload();
         };
 
         // Content Blocks
-        window.newContentBlock = () => openContentBlockModal();
-        window.editContentBlock = (id) => openContentBlockModal(id);
-        window.deleteContentBlock = async (id) => { if(confirm('Delete block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
-        function openContentBlockModal(id=null) {
-            const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'text', Content:'', Order:0 };
-            const html = `<div id="blockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name (e.g., hero)" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3"><option value="text" ${block.Type==='text'?'selected':''}>Text/HTML</option><option value="image" ${block.Type==='image'?'selected':''}>Image</option></select><textarea id="block_content" rows="6" class="w-full border p-3 rounded mb-3" placeholder="HTML content">${escapeHtml(block.Content)}</textarea><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-4"><div class="flex gap-3"><button onclick="submitContentBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
+        window.openBlockModal = (id=null) => {
+            const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'html', Content:'', Order:0, Location:'homepage' };
+            const html = `<div id="blockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name (e.g., hero)" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3"><option value="html" ${block.Type==='html'?'selected':''}>HTML</option><option value="text" ${block.Type==='text'?'selected':''}>Text</option><option value="image" ${block.Type==='image'?'selected':''}>Image URL</option></select><textarea id="block_content" rows="8" class="w-full border p-3 rounded mb-3" placeholder="HTML or text or image URL">${escapeHtml(block.Content)}</textarea><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option><option value="global" ${block.Location==='global'?'selected':''}>Global (footer)</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
             document.body.insertAdjacentHTML('beforeend', html);
-        }
-        window.submitContentBlock = async () => {
-            const data = { id: document.getElementById('block_id').value, blockName: document.getElementById('block_name').value, type: document.getElementById('block_type').value, content: document.getElementById('block_content').value, order: document.getElementById('block_order').value };
+        };
+        window.submitBlock = async () => {
+            const data = { id: document.getElementById('block_id').value, blockName: document.getElementById('block_name').value, type: document.getElementById('block_type').value, content: document.getElementById('block_content').value, order: document.getElementById('block_order').value, location: document.getElementById('block_location').value };
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
             location.reload();
         };
+        window.editBlock = (id) => openBlockModal(id);
+        window.deleteBlock = async (id) => { if(confirm('Delete block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
 
         // Pages
         window.openPageModal = (id=null) => {
@@ -333,9 +304,10 @@
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'savePage', data }) });
             location.reload();
         };
-        window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
+        window.editPage = (id) => openPageModal(id);
+        window.deletePage = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
 
-        // Products (full SEO + image upload)
+        // Products with image upload
         window.openProductModal = (id=null) => {
             const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
             const catOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category===c.ID?'selected':''}>${escapeHtml(c.Name)}</option>`).join('');
@@ -348,8 +320,40 @@
             location.reload();
         };
         window.deleteProductItem = async (id) => { if(confirm('Delete product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
+        window.editProduct = (id) => openProductModal(id);
+
+        window.uploadImageToDrive = async (fileInputId, targetInputId) => {
+            const fileInput = document.getElementById(fileInputId);
+            if (!fileInput || !fileInput.files.length) { alert("Select a file first"); return; }
+            const formData = new FormData();
+            formData.append('action', 'uploadImage');
+            formData.append('file', fileInput.files[0]);
+            formData.append('filename', fileInput.files[0].name);
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: formData });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    document.getElementById(targetInputId).value = json.url;
+                    alert("Image uploaded! URL inserted.");
+                } else alert("Upload failed: " + json.message);
+            } catch(e) { alert("Upload error"); }
+        };
 
         window.closeModal = (id) => { const el = document.getElementById(id); if (el) el.remove(); };
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+        window.addEventListener('hashchange', router);
+        window.addEventListener('load', fetchData);
+        async function router() {
+            const hash = location.hash || '#/';
+            const app = document.getElementById('app');
+            if (hash === '#/') renderHome(app);
+            else if (hash === '#/products') renderProductList(app);
+            else if (hash.startsWith('#/product/')) renderProductDetail(app, hash.split('/')[2]);
+            else if (hash.startsWith('#/page/')) renderPage(app, hash.split('/')[2]);
+            else if (hash === '#/admin-as') renderAdmin(app);
+            else renderHome(app);
+        }
     </script>
 </body>
 </html>
