@@ -11,12 +11,10 @@
     <style>
         :root { --primary: #0f172a; --radius: 1rem; --bg: #f8fafc; }
         body { background: var(--bg); font-family: 'Inter', sans-serif; }
-        .btn-primary { background: var(--primary); color: white; border-radius: var(--radius); transition: opacity 0.2s; }
-        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary { background: var(--primary); color: white; border-radius: var(--radius); }
         .dynamic-text { color: var(--primary); }
-        .dropdown:hover .dropdown-menu { display: block; }
-        .swiper-button-next, .swiper-button-prev { color: var(--primary) !important; background: white; width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .tab-active { border-bottom: 2px solid var(--primary); color: var(--primary); font-weight: bold; }
+        .dropdown:hover .dropdown-menu { display: block; }
     </style>
 </head>
 <body>
@@ -35,22 +33,19 @@
     <footer id="siteFooter" class="border-t mt-12 py-8 text-slate-500 text-sm"></footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbxBWLodLfRCe6nnTsdt6Z32y3l6QAk96UTs7GBr5G6N6eZvx21GZbYUybS3d1xRD__y/exec"; // REPLACE WITH YOUR URL
+        const API_URL = "https://script.google.com/macros/s/AKfycbwo83GBcF6M3iGzYvOIOdaCk6o2IdBPeIOa4v9yrA1yDuHBWUZRi0iX5XT-avmGxaME/exec"; // REPLACE
         let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [], footer: [] };
         let activeCategoryFilter = "all";
 
-        // ======================== FETCH & THEME ========================
         async function fetchData() {
-            try {
-                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
-                const json = await res.json();
-                store = json.data;
-                applyTheme();
-                buildHierarchicalMenu();
-                renderFooter();
-                injectSeoMetaTags();
-                router();
-            } catch(e) { console.error(e); }
+            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
+            const json = await res.json();
+            store = json.data;
+            applyTheme();
+            buildHierarchicalMenu();
+            renderFooter();
+            injectSeoMetaTags();
+            router();
         }
 
         function applyTheme() {
@@ -97,10 +92,7 @@
         function renderFooter() {
             const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
             const footerEl = document.getElementById('siteFooter');
-            if (footer.footer_html) {
-                footerEl.innerHTML = footer.footer_html;
-                return;
-            }
+            if (footer.footer_html) { footerEl.innerHTML = footer.footer_html; return; }
             let linksHtml = '';
             if (footer.footer_links) {
                 try {
@@ -119,7 +111,6 @@
             let description = seo.default_description || company.company_moto || "";
             let keywords = seo.default_keywords || "";
             let ogImage = seo.default_og_image || "";
-            
             if (hash.startsWith('#/product/')) {
                 const prod = store.products.find(p => p.ID === hash.split('/')[2]);
                 if (prod) {
@@ -130,12 +121,8 @@
                 }
             } else if (hash.startsWith('#/page/')) {
                 const page = store.pages.find(p => p.Slug === hash.split('/')[2]);
-                if (page) {
-                    title = page.Title;
-                    description = page.Content.replace(/<[^>]*>/g, '').substring(0, 160);
-                }
+                if (page) { title = page.Title; description = page.Content.replace(/<[^>]*>/g, '').substring(0, 160); }
             }
-            
             document.title = title;
             setMetaTag('description', description);
             setMetaTag('keywords', keywords);
@@ -159,25 +146,22 @@
             meta.setAttribute('content', content);
         }
 
-        // ======================== IMAGE UPLOAD HELPER ========================
-        async function uploadImageToDrive(fileInputId, targetInputId) {
-            const fileInput = document.getElementById(fileInputId);
-            if (!fileInput || !fileInput.files.length) { alert("Select a file first"); return; }
+        async function uploadImage(fileInput, targetFieldId) {
+            if (!fileInput.files.length) return;
             const formData = new FormData();
             formData.append('action', 'uploadImage');
             formData.append('file', fileInput.files[0]);
             formData.append('filename', fileInput.files[0].name);
-            try {
-                const res = await fetch(API_URL, { method: 'POST', body: formData });
-                const json = await res.json();
-                if (json.status === 'success') {
-                    document.getElementById(targetInputId).value = json.url;
-                    alert("Image uploaded! URL inserted.");
-                } else alert("Upload failed: " + json.message);
-            } catch(e) { alert("Upload error"); }
+            const res = await fetch(API_URL, { method: 'POST', body: formData });
+            const json = await res.json();
+            if (json.status === 'success') {
+                const targetField = document.getElementById(targetFieldId);
+                if (targetField) targetField.value = json.url;
+                else console.warn('Target field not found', targetFieldId);
+                alert('Image uploaded!');
+            } else alert('Upload failed');
         }
 
-        // ======================== BLOCK RENDERING ========================
         function renderBlocks(blocks, container) {
             if (!blocks.length) return;
             for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
@@ -199,106 +183,47 @@
                         const swiperId = `swiper-${Date.now()}`;
                         container.innerHTML += `
                             <div class="swiper ${swiperId} rounded-3xl mb-12 overflow-hidden">
-                                <div class="swiper-wrapper">
-                                    ${slides.map(slide => `
-                                        <div class="swiper-slide relative">
-                                            <img src="${escapeHtml(slide.image)}" alt="${escapeHtml(slide.alt)}" class="w-full h-[500px] object-cover">
-                                            <div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6">
-                                                <h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2>
-                                                <p class="text-lg mt-2">${escapeHtml(slide.description)}</p>
-                                            </div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                                <div class="swiper-button-next"></div>
-                                <div class="swiper-button-prev"></div>
-                                <div class="swiper-pagination"></div>
+                                <div class="swiper-wrapper">${slides.map(slide => `<div class="swiper-slide relative"><img src="${escapeHtml(slide.image)}" alt="${escapeHtml(slide.alt)}" class="w-full h-[500px] object-cover"><div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6"><h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2><p class="text-lg mt-2">${escapeHtml(slide.description)}</p></div></div>`).join('')}</div>
+                                <div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div>
                             </div>
                         `;
-                        setTimeout(() => {
-                            new Swiper(`.${swiperId}`, {
-                                navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
-                                pagination: { el: '.swiper-pagination', clickable: true },
-                                autoplay: settings.autoplay ? { delay: settings.interval || 5000 } : false,
-                                loop: slides.length > 1
-                            });
-                        }, 100);
+                        setTimeout(() => new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, autoplay: settings.autoplay ? { delay: settings.interval || 5000 } : false, loop: slides.length > 1 }), 100);
                     } else if (block.Type === 'custom_html') {
                         container.innerHTML += `<div class="mb-12">${settings}</div>`;
                     }
-                } catch(e) { console.error('Block render error', block, e); }
+                } catch(e) { console.error(e); }
             }
         }
 
-        // ======================== PUBLIC VIEWS ========================
         function renderHome(container) {
-            const homepageBlocks = (store.contentBlocks || []).filter(b => b.Location === 'homepage').sort((a,b)=>a.Order-b.Order);
-            if (homepageBlocks.length === 0) {
-                container.innerHTML = `<div class="text-center py-20">No content blocks. Go to Admin → Content Blocks to add Hero Image, Carousel, or Custom HTML.</div>`;
-                return;
-            }
+            const blocks = (store.contentBlocks || []).filter(b => b.Location === 'homepage').sort((a,b)=>a.Order-b.Order);
+            if (!blocks.length) { container.innerHTML = '<div class="text-center py-20">Add content blocks in Admin → Content Blocks</div>'; return; }
             container.innerHTML = '';
-            renderBlocks(homepageBlocks, container);
+            renderBlocks(blocks, container);
         }
 
         function renderProductList(container) {
             const filtered = activeCategoryFilter === "all" ? store.products : store.products.filter(p => p.Category == activeCategoryFilter);
             const cats = store.categories.length ? store.categories : [{ID:"general", Name:"General"}];
             container.innerHTML = `
-                <div class="flex flex-wrap gap-3 justify-center border-b pb-6 mb-8">
-                    <button data-cat="all" class="cat-pill px-5 py-2 rounded-full text-sm font-medium bg-slate-100 hover:dynamic-bg hover:text-white transition">ALL</button>
-                    ${cats.map(c => `<button data-cat="${c.ID}" class="cat-pill px-5 py-2 rounded-full text-sm font-medium bg-slate-100 hover:dynamic-bg hover:text-white transition">${escapeHtml(c.Name.toUpperCase())}</button>`).join('')}
-                </div>
-                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                    ${filtered.length ? filtered.map(p => `
-                        <div class="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition cursor-pointer" onclick="location.hash='#/product/${p.ID}'">
-                            <img src="${p.Thumbnail || 'https://placehold.co/600x400?text=No+Image'}" class="w-full h-56 object-cover">
-                            <div class="p-5">
-                                <div class="text-xs dynamic-text font-bold mb-1">${getCategoryName(p.Category)}</div>
-                                <h3 class="text-xl font-extrabold">${escapeHtml(p.Title)}</h3>
-                                <p class="text-slate-500 text-sm mt-2 line-clamp-2">${escapeHtml(p.Summary)}</p>
-                            </div>
-                        </div>
-                    `).join('') : '<div class="col-span-full text-center py-20 text-slate-400">No products found.</div>'}
-                </div>
+                <div class="flex flex-wrap gap-3 justify-center border-b pb-6 mb-8">${cats.map(c => `<button data-cat="${c.ID}" class="cat-pill px-5 py-2 rounded-full text-sm font-medium bg-slate-100 hover:dynamic-bg hover:text-white transition">${escapeHtml(c.Name.toUpperCase())}</button>`).join('')}<button data-cat="all" class="cat-pill px-5 py-2 rounded-full text-sm font-medium bg-slate-100 hover:dynamic-bg hover:text-white transition">ALL</button></div>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">${filtered.length ? filtered.map(p => `<div class="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition cursor-pointer" onclick="location.hash='#/product/${p.ID}'"><img src="${p.Thumbnail || 'https://placehold.co/600x400?text=No+Image'}" class="w-full h-56 object-cover"><div class="p-5"><div class="text-xs dynamic-text font-bold mb-1">${getCategoryName(p.Category)}</div><h3 class="text-xl font-extrabold">${escapeHtml(p.Title)}</h3><p class="text-slate-500 text-sm mt-2">${escapeHtml(p.Summary)}</p></div></div>`).join('') : '<div class="col-span-full text-center py-20">No products</div>'}</div>
             `;
-            document.querySelectorAll('.cat-pill').forEach(btn => {
-                btn.onclick = () => { activeCategoryFilter = btn.getAttribute('data-cat'); renderProductList(container); };
-                if (activeCategoryFilter === btn.getAttribute('data-cat')) btn.classList.add('dynamic-bg', 'text-white');
-                else btn.classList.remove('dynamic-bg', 'text-white');
-            });
+            document.querySelectorAll('.cat-pill').forEach(btn => btn.onclick = () => { activeCategoryFilter = btn.getAttribute('data-cat'); renderProductList(container); });
         }
 
         function renderProductDetail(container, id) {
             const p = store.products.find(x => x.ID == id);
-            if (!p) { container.innerHTML = '<div class="text-center py-20">Product not found</div>'; return; }
+            if (!p) { container.innerHTML = '<div class="text-center py-20">Not found</div>'; return; }
             const images = p.Images ? p.Images.split(',').map(i => i.trim()) : (p.Thumbnail ? [p.Thumbnail] : []);
             const swiperId = `swiper-${Date.now()}`;
-            container.innerHTML = `
-                <div class="max-w-6xl mx-auto">
-                    <button onclick="history.back()" class="mb-6 text-slate-400 hover:dynamic-text text-sm">← Back</button>
-                    <div class="grid md:grid-cols-2 gap-10">
-                        <div class="relative rounded-2xl overflow-hidden shadow-xl">
-                            <div class="swiper ${swiperId}">
-                                <div class="swiper-wrapper">${images.map(img => `<div class="swiper-slide"><img src="${img}" class="w-full h-96 object-cover"></div>`).join('')}</div>
-                                <div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div>
-                            </div>
-                        </div>
-                        <div><h1 class="text-4xl font-black dynamic-text">${escapeHtml(p.Title)}</h1><div class="mt-6 bg-white p-5 rounded-2xl shadow-sm"><h4 class="font-bold">Technical Info</h4><div class="text-slate-600 text-sm whitespace-pre-line mt-2">${escapeHtml(p.Technical_Info || 'No data')}</div></div></div>
-                    </div>
-                    <div class="mt-16 grid md:grid-cols-2 gap-8">
-                        <div class="bg-white p-6 rounded-2xl shadow"><h3 class="font-bold text-xl">Description</h3><div class="mt-3 text-slate-600">${escapeHtml(p.Description || '')}</div></div>
-                        <div class="space-y-6">${p.Terms ? `<div class="bg-white p-6 rounded-2xl"><h3 class="font-bold">Terms</h3><div class="text-sm text-slate-500">${escapeHtml(p.Terms)}</div></div>` : ''}${p.Privacy ? `<div class="bg-white p-6 rounded-2xl"><h3 class="font-bold">Privacy</h3><div class="text-sm text-slate-500">${escapeHtml(p.Privacy)}</div></div>` : ''}</div>
-                    </div>
-                </div>
-            `;
-            setTimeout(() => { new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, loop: images.length > 1 }); }, 50);
+            container.innerHTML = `<div class="max-w-6xl mx-auto"><button onclick="history.back()" class="mb-6 text-slate-400 hover:dynamic-text">← Back</button><div class="grid md:grid-cols-2 gap-10"><div class="relative rounded-2xl overflow-hidden shadow-xl"><div class="swiper ${swiperId}"><div class="swiper-wrapper">${images.map(img => `<div class="swiper-slide"><img src="${img}" class="w-full h-96 object-cover"></div>`).join('')}</div><div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div></div></div><div><h1 class="text-4xl font-black dynamic-text">${escapeHtml(p.Title)}</h1><div class="mt-6 bg-white p-5 rounded-2xl shadow-sm"><h4 class="font-bold">Tech Info</h4><div class="text-slate-600 text-sm mt-2">${escapeHtml(p.Technical_Info || 'No data')}</div></div></div></div><div class="mt-16 grid md:grid-cols-2 gap-8"><div class="bg-white p-6 rounded-2xl shadow"><h3 class="font-bold">Description</h3><div class="mt-3 text-slate-600">${escapeHtml(p.Description || '')}</div></div><div class="space-y-6">${p.Terms ? `<div class="bg-white p-6 rounded-2xl"><h3 class="font-bold">Terms</h3><div class="text-sm text-slate-500">${escapeHtml(p.Terms)}</div></div>` : ''}${p.Privacy ? `<div class="bg-white p-6 rounded-2xl"><h3 class="font-bold">Privacy</h3><div class="text-sm text-slate-500">${escapeHtml(p.Privacy)}</div></div>` : ''}</div></div></div>`;
+            setTimeout(() => new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, loop: images.length > 1 }), 50);
         }
 
         function renderPage(container, slug) {
             const page = store.pages.find(p => p.Slug === slug);
-            if (!page) { container.innerHTML = '<div class="text-center py-20">Page not found</div>'; return; }
-            container.innerHTML = `<div class="max-w-4xl mx-auto prose prose-lg">${page.Content || '<p>No content.</p>'}</div>`;
+            container.innerHTML = page ? `<div class="max-w-4xl mx-auto prose prose-lg">${page.Content || '<p>No content.</p>'}</div>` : '<div class="text-center py-20">Page not found</div>';
         }
 
         function getCategoryName(catId) {
@@ -310,21 +235,10 @@
         function renderAdmin(container) {
             const token = localStorage.getItem('ws_token');
             if (!token) {
-                container.innerHTML = `<div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow mt-12"><h2 class="text-2xl font-black mb-4">Admin Login</h2><input id="admUser" class="w-full border p-3 rounded mb-3" placeholder="Username"><input id="admPass" type="password" class="w-full border p-3 rounded mb-5" placeholder="Password"><button onclick="adminLogin()" class="btn-primary w-full py-3 rounded">Login</button></div>`;
+                container.innerHTML = `<div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow mt-12"><h2 class="text-2xl font-black mb-4">Admin Login</h2><input id="admUser" class="w-full border p-3 rounded mb-3"><input id="admPass" type="password" class="w-full border p-3 rounded mb-5"><button onclick="adminLogin()" class="btn-primary w-full py-3 rounded">Login</button></div>`;
                 return;
             }
-            container.innerHTML = `
-                <div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-black">Admin Console</h1><button onclick="adminLogout()" class="text-red-500 border px-4 py-1 rounded-full text-sm">Logout</button></div>
-                <div class="flex flex-wrap gap-2 border-b mb-6">
-                    <button data-tab="site" class="tab-btn px-4 py-2">Site & Theme</button>
-                    <button data-tab="blocks" class="tab-btn px-4 py-2">Content Blocks</button>
-                    <button data-tab="pages" class="tab-btn px-4 py-2">Pages (Menu)</button>
-                    <button data-tab="products" class="tab-btn px-4 py-2">Products</button>
-                    <button data-tab="seo" class="tab-btn px-4 py-2">SEO</button>
-                    <button data-tab="footer" class="tab-btn px-4 py-2">Footer</button>
-                </div>
-                <div id="tabContent"></div>
-            `;
+            container.innerHTML = `<div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-black">Admin Console</h1><button onclick="adminLogout()" class="text-red-500 border px-4 py-1 rounded-full">Logout</button></div><div class="flex flex-wrap gap-2 border-b mb-6"><button data-tab="site" class="tab-btn px-4 py-2">Site & Theme</button><button data-tab="blocks" class="tab-btn px-4 py-2">Content Blocks</button><button data-tab="pages" class="tab-btn px-4 py-2">Pages</button><button data-tab="products" class="tab-btn px-4 py-2">Products</button><button data-tab="seo" class="tab-btn px-4 py-2">SEO</button><button data-tab="footer" class="tab-btn px-4 py-2">Footer</button></div><div id="tabContent"></div>`;
             document.querySelectorAll('.tab-btn').forEach(btn => btn.onclick = () => loadTab(btn.innerText.toLowerCase().includes('site')?'site':btn.innerText.toLowerCase().includes('blocks')?'blocks':btn.innerText.toLowerCase().includes('pages')?'pages':btn.innerText.toLowerCase().includes('products')?'products':btn.innerText.toLowerCase().includes('seo')?'seo':'footer'));
             loadTab('site');
         }
@@ -336,17 +250,8 @@
                 const theme = Object.fromEntries((store.theme || []).map(i=>[i.Key,i.Value]));
                 const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
                 div.innerHTML = `
-                    <div class="bg-white p-6 rounded-2xl shadow space-y-4"><h3 class="font-black">Theme</h3><div class="grid md:grid-cols-2 gap-3">
-                        <label>Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color||'#0f172a'}">
-                        <label>Body Background</label><input type="color" id="body_bg" value="${theme.body_bg||'#f8fafc'}">
-                        <label>Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius||16}">
-                        <label>Base Font Size (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size||16}">
-                        <label>Font Family</label><input id="font_family" value="${theme.font_family||'Inter'}" class="border p-2 rounded">
-                        <label>Logo</label><div class="flex gap-2"><input type="file" id="logoUpload" accept="image/*" class="text-sm"><button onclick="uploadImageToDrive('logoUpload','comp_logo_url')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload Logo</button></div>
-                    </div><button onclick="saveTheme()" class="btn-primary px-4 py-2 rounded mt-4">Save Theme</button></div>
-                    <div class="bg-white p-6 rounded-2xl shadow mt-6"><h3 class="font-black">Company Info</h3><div class="grid md:grid-cols-2 gap-3">
-                        ${Object.entries(company).map(([k,v])=>`<div><label>${k}</label><input id="comp_${k}" value="${escapeHtml(v)}" class="w-full border p-2 rounded"></div>`).join('')}
-                    </div><button onclick="saveCompanyInfo()" class="btn-primary px-4 py-2 rounded mt-4">Save Company</button></div>
+                    <div class="bg-white p-6 rounded-2xl shadow space-y-4"><h3 class="font-black">Theme</h3><div class="grid md:grid-cols-2 gap-3"><label>Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color||'#0f172a'}"><label>Body BG</label><input type="color" id="body_bg" value="${theme.body_bg||'#f8fafc'}"><label>Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius||16}"><label>Base Font (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size||16}"><label>Font Family</label><input id="font_family" value="${theme.font_family||'Inter'}" class="border p-2 rounded"></div><button onclick="saveTheme()" class="btn-primary px-4 py-2 rounded mt-4">Save Theme</button></div>
+                    <div class="bg-white p-6 rounded-2xl shadow mt-6"><h3 class="font-black">Company Info</h3><div class="space-y-3"><div><label>Site Title</label><input id="comp_site_title" value="${escapeHtml(company.site_title||'')}" class="w-full border p-2 rounded"></div><div><label>Company Name</label><input id="comp_company_name" value="${escapeHtml(company.company_name||'')}" class="w-full border p-2 rounded"></div><div><label>Company Moto</label><input id="comp_company_moto" value="${escapeHtml(company.company_moto||'')}" class="w-full border p-2 rounded"></div><div><label>Logo</label><div class="flex gap-2"><input type="file" id="logoUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('logoUpload'),'comp_logo_url')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="comp_logo_url" value="${escapeHtml(company.logo_url||'')}" class="w-full border p-2 rounded mt-2" placeholder="Logo URL will appear here"></div></div><button onclick="saveCompanyInfo()" class="btn-primary px-4 py-2 rounded mt-4">Save Company</button></div>
                 `;
             } else if (tab === 'blocks') {
                 div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow"><div id="blocksList"></div><button onclick="openBlockModal()" class="btn-primary px-4 py-2 rounded mt-4">+ Add Block</button></div>`;
@@ -359,52 +264,45 @@
                 renderProductsTable();
             } else if (tab === 'seo') {
                 const seo = Object.fromEntries((store.seoDefaults || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><div class="flex gap-2"><input type="file" id="ogImageUpload" accept="image/*"><button onclick="uploadImageToDrive('ogImageUpload','seo_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload OG Image</button></div><input id="seo_ogimage" placeholder="OG Image URL" value="${seo.default_og_image||''}" class="w-full border p-2 rounded"><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded">Save SEO</button></div>`;
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Global SEO</h3><input id="seo_title" placeholder="Default Title" value="${seo.default_title||''}" class="w-full border p-2 rounded"><textarea id="seo_desc" placeholder="Default Description" class="w-full border p-2 rounded">${seo.default_description||''}</textarea><input id="seo_keywords" placeholder="Default Keywords" value="${seo.default_keywords||''}" class="w-full border p-2 rounded"><div><label>Default OG Image</label><div class="flex gap-2"><input type="file" id="ogImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('ogImageUpload'),'seo_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="seo_ogimage" value="${seo.default_og_image||''}" class="w-full border p-2 rounded mt-2"></div><input id="seo_twitter" placeholder="Twitter Handle" value="${seo.twitter_handle||''}" class="w-full border p-2 rounded"><button onclick="saveSeo()" class="btn-primary px-4 py-2 rounded">Save SEO</button></div>`;
             } else if (tab === 'footer') {
                 const footer = Object.fromEntries((store.footer || []).map(i=>[i.Key,i.Value]));
-                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Footer Settings</h3><label>Copyright Text</label><input id="footer_copyright" value="${escapeHtml(footer.copyright_text||'')}" class="w-full border p-2 rounded"><label>Links (JSON array: [{"text":"Home","url":"/"}])</label><textarea id="footer_links" rows="3" class="w-full border p-2 rounded">${escapeHtml(footer.footer_links||'[]')}</textarea><label>Custom HTML (overrides links & copyright)</label><textarea id="footer_html" rows="4" class="w-full border p-2 rounded">${escapeHtml(footer.footer_html||'')}</textarea><button onclick="saveFooter()" class="btn-primary px-4 py-2 rounded">Save Footer</button></div>`;
+                div.innerHTML = `<div class="bg-white p-6 rounded-2xl shadow space-y-3"><h3 class="font-black">Footer Settings</h3><input id="footer_copyright" placeholder="Copyright Text" value="${escapeHtml(footer.copyright_text||'')}" class="w-full border p-2 rounded"><textarea id="footer_links" placeholder='Links JSON: [{"text":"Home","url":"/"}]' rows="3" class="w-full border p-2 rounded">${escapeHtml(footer.footer_links||'[]')}</textarea><textarea id="footer_html" placeholder="Custom HTML (overrides above)" rows="4" class="w-full border p-2 rounded">${escapeHtml(footer.footer_html||'')}</textarea><button onclick="saveFooter()" class="btn-primary px-4 py-2 rounded">Save Footer</button></div>`;
             }
         }
 
         function renderBlocksList() {
-            const blocks = store.contentBlocks || [];
             const container = document.getElementById('blocksList');
             if (!container) return;
-            container.innerHTML = blocks.map(b => `
-                <div class="border-b py-3 flex justify-between items-center"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type})<br><div class="text-xs text-slate-500">Order: ${b.Order} | Location: ${b.Location}</div></div><div><button onclick="editBlock('${b.BlockID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteBlock('${b.BlockID}')" class="text-red-500">Delete</button></div></div>
-            `).join('');
+            container.innerHTML = (store.contentBlocks || []).map(b => `<div class="border-b py-3 flex justify-between items-center"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type})<br><div class="text-xs text-slate-500">Order: ${b.Order} | Location: ${b.Location}</div></div><div><button onclick="editBlock('${b.BlockID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteBlock('${b.BlockID}')" class="text-red-500">Delete</button></div></div>`).join('');
         }
 
         function renderPagesList() {
-            const pages = store.pages || [];
             const container = document.getElementById('pagesList');
             if (!container) return;
-            container.innerHTML = pages.map(p => `
-                <div class="border-b py-3 flex justify-between"><div><b>${escapeHtml(p.Title)}</b> /${p.Slug} ${p.ParentID ? '(child)' : ''}</div><div><button onclick="editPage('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deletePageItem('${p.ID}')" class="text-red-500">Delete</button></div></div>
-            `).join('');
+            container.innerHTML = (store.pages || []).map(p => `<div class="border-b py-3 flex justify-between"><div><b>${escapeHtml(p.Title)}</b> /${p.Slug} ${p.ParentID ? '(child)' : ''}</div><div><button onclick="editPage('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deletePageItem('${p.ID}')" class="text-red-500">Delete</button></div></div>`).join('');
         }
 
         function renderProductsTable() {
             const container = document.getElementById('productsTable');
             if (!container) return;
-            container.innerHTML = `<table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModal('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></table>`;
+            container.innerHTML = `<table class="w-full"><thead class="bg-slate-100"><tr><th class="p-3 text-left">Title</th><th>Category</th><th class="text-right">Actions</th></tr></thead><tbody>${store.products.map(p => `<tr class="border-b"><td class="p-3">${escapeHtml(p.Title)}</td><td>${getCategoryName(p.Category)}</td><td class="text-right"><button onclick="openProductModal('${p.ID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteProductItem('${p.ID}')" class="text-red-500">Delete</button></td></tr>`).join('')}</tbody></table>`;
         }
 
-        // ======================== CRUD ACTIONS ========================
+        // CRUD functions
         window.adminLogin = async () => {
             const res = await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'login', data:{ username:document.getElementById('admUser').value, password:document.getElementById('admPass').value } }) });
             const json = await res.json();
-            if (json.status === 'success') { localStorage.setItem('ws_token', json.token); router(); } else alert('Invalid credentials');
+            if (json.status === 'success') { localStorage.setItem('ws_token', json.token); router(); } else alert('Invalid');
         };
         window.adminLogout = () => { localStorage.removeItem('ws_token'); router(); };
-
         window.saveTheme = async () => {
             const data = { primary_color: document.getElementById('primary_color')?.value, body_bg: document.getElementById('body_bg')?.value, card_radius: document.getElementById('card_radius')?.value, base_font_size: document.getElementById('base_font_size')?.value, font_family: document.getElementById('font_family')?.value };
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateTheme', data }) });
             location.reload();
         };
         window.saveCompanyInfo = async () => {
-            const data = {}; document.querySelectorAll('[id^="comp_"]').forEach(inp => { data[inp.id.replace('comp_','')] = inp.value; });
+            const data = { site_title: document.getElementById('comp_site_title')?.value, company_name: document.getElementById('comp_company_name')?.value, company_moto: document.getElementById('comp_company_moto')?.value, logo_url: document.getElementById('comp_logo_url')?.value };
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSettings', data }) });
             location.reload();
         };
@@ -419,175 +317,128 @@
             location.reload();
         };
 
-        // Content Blocks with image upload for hero and carousel
+        // Block modals (simplified, with image upload only)
         window.openBlockModal = (id=null) => {
             const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'hero_image', Settings:'{}', Order:0, Location:'homepage' };
             let settings = {};
-            try { settings = JSON.parse(block.Settings || '{}'); } catch(e) {}
-            const modalHtml = `<div id="blockModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto"><div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3" onchange="toggleBlockSettings()"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer"></div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            window.toggleBlockSettings = () => {
+            try { settings = JSON.parse(block.Settings); } catch(e) {}
+            const modal = document.createElement('div');
+            modal.id = 'blockModal';
+            modal.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
+            modal.innerHTML = `<div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer"></div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
+            document.body.appendChild(modal);
+            const renderSettings = () => {
                 const type = document.getElementById('block_type').value;
                 const container = document.getElementById('settingsContainer');
                 if (type === 'hero_image') {
-                    container.innerHTML = `
-                        <div class="flex gap-2 mb-3"><input type="file" id="heroImageUpload" accept="image/*"><button onclick="uploadImageToDrive('heroImageUpload','hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload Image</button></div>
-                        <input id="hero_image" placeholder="Image URL" value="${escapeHtml(settings.image||'')}" class="w-full border p-2 rounded mb-2">
-                        <input id="hero_caption" placeholder="Caption" value="${escapeHtml(settings.caption||'')}" class="w-full border p-2 rounded mb-2">
-                        <textarea id="hero_desc" placeholder="Description" class="w-full border p-2 rounded mb-2">${escapeHtml(settings.description||'')}</textarea>
-                        <input id="hero_alt" placeholder="Alt Text" value="${escapeHtml(settings.alt||'')}" class="w-full border p-2 rounded mb-2">
-                        <input id="hero_btn_text" placeholder="Button Text (optional)" value="${escapeHtml(settings.buttonText||'')}" class="w-full border p-2 rounded mb-2">
-                        <input id="hero_btn_link" placeholder="Button Link" value="${escapeHtml(settings.buttonLink||'#/products')}" class="w-full border p-2 rounded mb-2">
-                    `;
+                    container.innerHTML = `<div class="flex gap-2 mb-2"><input type="file" id="heroImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('heroImageUpload'),'hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="hero_image" placeholder="Image URL (auto-filled)" value="${escapeHtml(settings.image||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_caption" placeholder="Caption" value="${escapeHtml(settings.caption||'')}" class="w-full border p-2 rounded mb-2"><textarea id="hero_desc" placeholder="Description" class="w-full border p-2 rounded mb-2">${escapeHtml(settings.description||'')}</textarea><input id="hero_alt" placeholder="Alt Text" value="${escapeHtml(settings.alt||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_btn_text" placeholder="Button Text" value="${escapeHtml(settings.buttonText||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_btn_link" placeholder="Button Link" value="${escapeHtml(settings.buttonLink||'#/products')}" class="w-full border p-2 rounded">`;
                 } else if (type === 'carousel') {
                     const slides = settings.slides || [];
-                    container.innerHTML = `
-                        <label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${settings.autoplay?'selected':''}>Yes</option><option value="false" ${!settings.autoplay?'selected':''}>No</option></select>
-                        <label>Interval (ms)</label><input id="carousel_interval" type="number" value="${settings.interval||5000}" class="w-full border p-2 rounded mb-4">
-                        <div id="carouselSlidesList"></div>
-                        <button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>
-                    `;
-                    window.renderCarouselSlides = (slides) => {
+                    container.innerHTML = `<label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${settings.autoplay?'selected':''}>Yes</option><option value="false" ${!settings.autoplay?'selected':''}>No</option></select><label>Interval (ms)</label><input id="carousel_interval" type="number" value="${settings.interval||5000}" class="w-full border p-2 rounded mb-4"><div id="carouselSlidesList"></div><button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>`;
+                    const renderSlides = () => {
                         const list = document.getElementById('carouselSlidesList');
                         if (!list) return;
                         list.innerHTML = '';
                         slides.forEach((slide, idx) => {
                             const div = document.createElement('div');
                             div.className = 'border p-3 rounded mb-2';
-                            div.innerHTML = `<h4>Slide ${idx+1}</h4>
-                                <div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadCarouselSlideImage(this,'${idx}')" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div>
-                                <input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1">
-                                <input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1">
-                                <textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea>
-                                <input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded">
-                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                            div.innerHTML = `<h4>Slide ${idx+1}</h4><div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this, ${idx})" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div><input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea><input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
                             list.appendChild(div);
                         });
                     };
-                    window.uploadCarouselSlideImage = (btn, idx) => {
+                    window.uploadSlideImage = (btn, idx) => {
                         const fileInput = btn.previousElementSibling;
                         if (!fileInput.files.length) return;
                         const formData = new FormData();
                         formData.append('action', 'uploadImage');
                         formData.append('file', fileInput.files[0]);
-                        fetch(API_URL, { method:'POST', body:formData }).then(r=>r.json()).then(json=>{
-                            if(json.status==='success') {
-                                const slideDiv = btn.closest('.border');
-                                slideDiv.querySelector('.slide-image').value = json.url;
-                                alert('Uploaded');
-                            } else alert('Failed');
-                        });
+                        fetch(API_URL, { method:'POST', body:formData }).then(r=>r.json()).then(json=>{ if(json.status==='success') btn.closest('.border').querySelector('.slide-image').value = json.url; });
                     };
                     window.addCarouselSlide = () => {
                         const list = document.getElementById('carouselSlidesList');
-                        const idx = list.children.length;
                         const div = document.createElement('div');
                         div.className = 'border p-3 rounded mb-2';
-                        div.innerHTML = `<h4>Slide ${idx+1}</h4>
-                            <div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadCarouselSlideImage(this,${idx})" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div>
-                            <input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1">
-                            <input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1">
-                            <textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea>
-                            <input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded">
-                            <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                        div.innerHTML = `<h4>Slide ${list.children.length+1}</h4><div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this, null)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div><input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea><input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
                         list.appendChild(div);
                     };
-                    window.renderCarouselSlides(slides);
+                    renderSlides();
                 } else {
-                    container.innerHTML = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded" placeholder="<div>Your HTML content</div>">${escapeHtml(block.Settings)}</textarea>`;
+                    container.innerHTML = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded">${escapeHtml(block.Settings)}</textarea>`;
                 }
             };
-            window.toggleBlockSettings();
-        };
-        window.submitBlock = async () => {
-            const type = document.getElementById('block_type').value;
-            let settings = {};
-            if (type === 'hero_image') {
-                settings = {
-                    image: document.getElementById('hero_image')?.value || '',
-                    caption: document.getElementById('hero_caption')?.value || '',
-                    description: document.getElementById('hero_desc')?.value || '',
-                    alt: document.getElementById('hero_alt')?.value || '',
-                    buttonText: document.getElementById('hero_btn_text')?.value || '',
-                    buttonLink: document.getElementById('hero_btn_link')?.value || '#/products'
-                };
-            } else if (type === 'carousel') {
-                const slides = [];
-                const slideDivs = document.querySelectorAll('#carouselSlidesList > div');
-                slideDivs.forEach(div => {
-                    const image = div.querySelector('.slide-image')?.value || '';
-                    const caption = div.querySelector('.slide-caption')?.value || '';
-                    const description = div.querySelector('.slide-desc')?.value || '';
-                    const alt = div.querySelector('.slide-alt')?.value || '';
-                    if (image) slides.push({ image, caption, description, alt });
-                });
-                settings = {
-                    autoplay: document.getElementById('carousel_autoplay')?.value === 'true',
-                    interval: parseInt(document.getElementById('carousel_interval')?.value) || 5000,
-                    slides: slides
-                };
-            } else {
-                settings = document.getElementById('custom_html')?.value || '';
-            }
-            const data = {
-                id: document.getElementById('block_id').value,
-                blockName: document.getElementById('block_name').value,
-                type: type,
-                settings: JSON.stringify(settings),
-                order: document.getElementById('block_order').value,
-                location: document.getElementById('block_location').value
+            renderSettings();
+            window.submitBlock = async () => {
+                const type = document.getElementById('block_type').value;
+                let settings = {};
+                if (type === 'hero_image') {
+                    settings = { image: document.getElementById('hero_image')?.value, caption: document.getElementById('hero_caption')?.value, description: document.getElementById('hero_desc')?.value, alt: document.getElementById('hero_alt')?.value, buttonText: document.getElementById('hero_btn_text')?.value, buttonLink: document.getElementById('hero_btn_link')?.value };
+                } else if (type === 'carousel') {
+                    const slides = [];
+                    document.querySelectorAll('#carouselSlidesList > div').forEach(div => {
+                        const image = div.querySelector('.slide-image')?.value;
+                        if (image) slides.push({ image, caption: div.querySelector('.slide-caption')?.value, description: div.querySelector('.slide-desc')?.value, alt: div.querySelector('.slide-alt')?.value });
+                    });
+                    settings = { autoplay: document.getElementById('carousel_autoplay')?.value === 'true', interval: parseInt(document.getElementById('carousel_interval')?.value) || 5000, slides };
+                } else {
+                    settings = document.getElementById('custom_html')?.value;
+                }
+                const data = { id: document.getElementById('block_id').value, blockName: document.getElementById('block_name').value, type: type, settings: JSON.stringify(settings), order: document.getElementById('block_order').value, location: document.getElementById('block_location').value };
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
+                location.reload();
             };
-            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
-            location.reload();
         };
         window.editBlock = (id) => openBlockModal(id);
-        window.deleteBlock = async (id) => { if(confirm('Delete block?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
+        window.deleteBlock = async (id) => { if(confirm('Delete?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); location.reload(); } };
 
-        // Pages CRUD
+        // Pages
         window.openPageModal = (id=null) => {
             const page = id ? store.pages.find(p => p.ID == id) : { ID:'', Slug:'', Title:'', Content:'', MenuOrder:0, Status:'published', ParentID:'' };
-            const parentOptions = `<option value="">None (Root)</option>` + (store.pages || []).filter(p => p.ID !== page.ID).map(p => `<option value="${p.ID}" ${page.ParentID===p.ID?'selected':''}>${escapeHtml(p.Title)}</option>`).join('');
-            const html = `<div id="pageModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4"><div class="bg-white w-full max-w-3xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Page' : 'New Page'}</h3><input type="hidden" id="page_id" value="${page.ID}"><input id="page_title" placeholder="Title" value="${escapeHtml(page.Title)}" class="w-full border p-3 rounded mb-3"><input id="page_slug" placeholder="Slug (URL)" value="${escapeHtml(page.Slug)}" class="w-full border p-3 rounded mb-3"><select id="page_parent" class="w-full border p-3 rounded mb-3">${parentOptions}</select><input id="page_order" type="number" placeholder="Menu Order" value="${page.MenuOrder}" class="w-full border p-3 rounded mb-3"><select id="page_status" class="w-full border p-3 rounded mb-3"><option value="published" ${page.Status==='published'?'selected':''}>Published</option><option value="draft" ${page.Status==='draft'?'selected':''}>Draft</option></select><textarea id="page_content" rows="8" class="w-full border p-3 rounded mb-4" placeholder="HTML content">${escapeHtml(page.Content)}</textarea><div class="flex gap-3"><button onclick="submitPage()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('pageModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
-            document.body.insertAdjacentHTML('beforeend', html);
-        };
-        window.submitPage = async () => {
-            const data = { id: document.getElementById('page_id').value, title: document.getElementById('page_title').value, slug: document.getElementById('page_slug').value, parentId: document.getElementById('page_parent').value, menuOrder: document.getElementById('page_order').value, status: document.getElementById('page_status').value, content: document.getElementById('page_content').value };
-            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'savePage', data }) });
-            location.reload();
+            const parentOptions = '<option value="">None (Root)</option>' + (store.pages || []).filter(p => p.ID !== page.ID).map(p => `<option value="${p.ID}" ${page.ParentID===p.ID?'selected':''}>${escapeHtml(p.Title)}</option>`).join('');
+            const modal = document.createElement('div');
+            modal.id = 'pageModal';
+            modal.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4';
+            modal.innerHTML = `<div class="bg-white w-full max-w-3xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Page' : 'New Page'}</h3><input type="hidden" id="page_id" value="${page.ID}"><input id="page_title" placeholder="Title" value="${escapeHtml(page.Title)}" class="w-full border p-3 rounded mb-3"><input id="page_slug" placeholder="Slug" value="${escapeHtml(page.Slug)}" class="w-full border p-3 rounded mb-3"><select id="page_parent" class="w-full border p-3 rounded mb-3">${parentOptions}</select><input id="page_order" type="number" placeholder="Menu Order" value="${page.MenuOrder}" class="w-full border p-3 rounded mb-3"><select id="page_status" class="w-full border p-3 rounded mb-3"><option value="published" ${page.Status==='published'?'selected':''}>Published</option><option value="draft" ${page.Status==='draft'?'selected':''}>Draft</option></select><textarea id="page_content" rows="8" class="w-full border p-3 rounded mb-4" placeholder="HTML content">${escapeHtml(page.Content)}</textarea><div class="flex gap-3"><button onclick="submitPage()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('pageModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
+            document.body.appendChild(modal);
+            window.submitPage = async () => {
+                const data = { id: document.getElementById('page_id').value, title: document.getElementById('page_title').value, slug: document.getElementById('page_slug').value, parentId: document.getElementById('page_parent').value, menuOrder: document.getElementById('page_order').value, status: document.getElementById('page_status').value, content: document.getElementById('page_content').value };
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'savePage', data }) });
+                location.reload();
+            };
         };
         window.editPage = (id) => openPageModal(id);
         window.deletePageItem = async (id) => { if(confirm('Delete page?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); location.reload(); } };
 
-        // Products with image upload for thumbnail and images
+        // Products (simplified, with image upload only)
         window.openProductModal = (id=null) => {
             const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
             const catOptions = store.categories.map(c => `<option value="${c.ID}" ${prod.Category===c.ID?'selected':''}>${escapeHtml(c.Name)}</option>`).join('');
-            const modalHtml = `<div id="productModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto"><div class="bg-white w-full max-w-5xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Product' : 'New Product'}</h3><input type="hidden" id="prod_id" value="${prod.ID}"><div class="grid md:grid-cols-2 gap-4"><div><label>Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border p-2 rounded mb-2"><label>Category</label><select id="prod_cat" class="w-full border p-2 rounded mb-2">${catOptions}</select><label>Thumbnail</label><div class="flex gap-2 mb-2"><input type="file" id="thumbUpload" accept="image/*"><button onclick="uploadImageToDrive('thumbUpload','prod_thumb')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="prod_thumb" value="${escapeHtml(prod.Thumbnail)}" class="w-full border p-2 rounded mb-2"><label>Images (comma URLs)</label><textarea id="prod_images" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Images)}</textarea><div class="flex gap-2 mb-2"><input type="file" id="multiImagesUpload" accept="image/*" multiple><button onclick="uploadMultipleImages()" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload & Add</button></div><label>Summary</label><textarea id="prod_summary" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Summary)}</textarea><label>Description</label><textarea id="prod_desc" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Description)}</textarea></div><div><label>Technical Info</label><textarea id="prod_tech" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Technical_Info)}</textarea><label>Terms</label><textarea id="prod_terms" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Terms)}</textarea><label>Privacy</label><textarea id="prod_privacy" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Privacy)}</textarea><label>Service Commitment</label><textarea id="prod_service" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.ServiceCommitment)}</textarea><hr class="my-2"><label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle)}" class="w-full border p-2 rounded mb-2"><label>SEO Description</label><textarea id="prod_seod" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.SEODesc)}</textarea><label>SEO Keywords</label><input id="prod_seok" value="${escapeHtml(prod.SEOKeywords)}" class="w-full border p-2 rounded mb-2"><label>OG Title</label><input id="prod_ogtitle" value="${escapeHtml(prod.OGTitle)}" class="w-full border p-2 rounded mb-2"><label>OG Description</label><textarea id="prod_ogdesc" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.OGDesc)}</textarea><label>OG Image</label><div class="flex gap-2 mb-2"><input type="file" id="ogImageUploadProd" accept="image/*"><button onclick="uploadImageToDrive('ogImageUploadProd','prod_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="prod_ogimage" value="${escapeHtml(prod.OGImage)}" class="w-full border p-2 rounded mb-2"><label>Twitter Card</label><input id="prod_twcard" value="${escapeHtml(prod.TwitterCard)}" class="w-full border p-2 rounded mb-2"></div></div><div class="flex gap-3 mt-6"><button onclick="submitProduct()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('productModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div></div>`;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = document.createElement('div');
+            modal.id = 'productModal';
+            modal.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
+            modal.innerHTML = `<div class="bg-white w-full max-w-5xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Product' : 'New Product'}</h3><input type="hidden" id="prod_id" value="${prod.ID}"><div class="grid md:grid-cols-2 gap-4"><div><label>Title</label><input id="prod_title" value="${escapeHtml(prod.Title)}" class="w-full border p-2 rounded mb-2"><label>Category</label><select id="prod_cat" class="w-full border p-2 rounded mb-2">${catOptions}</select><label>Thumbnail</label><div class="flex gap-2 mb-2"><input type="file" id="thumbUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('thumbUpload'),'prod_thumb')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="prod_thumb" value="${escapeHtml(prod.Thumbnail)}" class="w-full border p-2 rounded mb-2"><label>Images (comma URLs)</label><textarea id="prod_images" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Images)}</textarea><div class="flex gap-2 mb-2"><input type="file" id="multiImagesUpload" accept="image/*" multiple><button onclick="uploadMultipleImages()" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload Multiple</button></div><label>Summary</label><textarea id="prod_summary" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Summary)}</textarea><label>Description</label><textarea id="prod_desc" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Description)}</textarea></div><div><label>Technical Info</label><textarea id="prod_tech" class="w-full border p-2 rounded mb-2" rows="3">${escapeHtml(prod.Technical_Info)}</textarea><label>Terms</label><textarea id="prod_terms" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Terms)}</textarea><label>Privacy</label><textarea id="prod_privacy" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.Privacy)}</textarea><label>Service Commitment</label><textarea id="prod_service" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.ServiceCommitment)}</textarea><hr class="my-2"><label>SEO Title</label><input id="prod_seot" value="${escapeHtml(prod.SEOTitle)}" class="w-full border p-2 rounded mb-2"><label>SEO Description</label><textarea id="prod_seod" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.SEODesc)}</textarea><label>SEO Keywords</label><input id="prod_seok" value="${escapeHtml(prod.SEOKeywords)}" class="w-full border p-2 rounded mb-2"><label>OG Title</label><input id="prod_ogtitle" value="${escapeHtml(prod.OGTitle)}" class="w-full border p-2 rounded mb-2"><label>OG Description</label><textarea id="prod_ogdesc" class="w-full border p-2 rounded mb-2" rows="2">${escapeHtml(prod.OGDesc)}</textarea><label>OG Image</label><div class="flex gap-2 mb-2"><input type="file" id="ogImageUploadProd" accept="image/*"><button onclick="uploadImage(document.getElementById('ogImageUploadProd'),'prod_ogimage')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="prod_ogimage" value="${escapeHtml(prod.OGImage)}" class="w-full border p-2 rounded mb-2"><label>Twitter Card</label><input id="prod_twcard" value="${escapeHtml(prod.TwitterCard)}" class="w-full border p-2 rounded mb-2"></div></div><div class="flex gap-3 mt-6"><button onclick="submitProduct()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('productModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
+            document.body.appendChild(modal);
             window.uploadMultipleImages = async () => {
                 const files = document.getElementById('multiImagesUpload').files;
                 const current = document.getElementById('prod_images').value;
                 const urls = current ? current.split(',').map(u=>u.trim()) : [];
                 for (let file of files) {
-                    const formData = new FormData();
-                    formData.append('action', 'uploadImage');
-                    formData.append('file', file);
-                    formData.append('filename', file.name);
-                    const res = await fetch(API_URL, { method:'POST', body:formData });
+                    const fd = new FormData();
+                    fd.append('action', 'uploadImage');
+                    fd.append('file', file);
+                    const res = await fetch(API_URL, { method:'POST', body:fd });
                     const json = await res.json();
                     if (json.status === 'success') urls.push(json.url);
                 }
                 document.getElementById('prod_images').value = urls.join(',');
-                alert('Uploaded ' + files.length + ' images');
+                alert('Uploaded');
+            };
+            window.submitProduct = async () => {
+                const data = { id: document.getElementById('prod_id').value, catId: document.getElementById('prod_cat').value, title: document.getElementById('prod_title').value, thumb: document.getElementById('prod_thumb').value, imgs: document.getElementById('prod_images').value, summary: document.getElementById('prod_summary').value, desc: document.getElementById('prod_desc').value, tech: document.getElementById('prod_tech').value, terms: document.getElementById('prod_terms').value, privacy: document.getElementById('prod_privacy').value, serviceCommitment: document.getElementById('prod_service').value, seoT: document.getElementById('prod_seot').value, seoD: document.getElementById('prod_seod').value, seoK: document.getElementById('prod_seok').value, ogTitle: document.getElementById('prod_ogtitle').value, ogDesc: document.getElementById('prod_ogdesc').value, ogImage: document.getElementById('prod_ogimage').value, twCard: document.getElementById('prod_twcard').value };
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveProduct', data }) });
+                location.reload();
             };
         };
-        window.submitProduct = async () => {
-            const data = { id: document.getElementById('prod_id').value, catId: document.getElementById('prod_cat').value, title: document.getElementById('prod_title').value, thumb: document.getElementById('prod_thumb').value, imgs: document.getElementById('prod_images').value, summary: document.getElementById('prod_summary').value, desc: document.getElementById('prod_desc').value, tech: document.getElementById('prod_tech').value, terms: document.getElementById('prod_terms').value, privacy: document.getElementById('prod_privacy').value, serviceCommitment: document.getElementById('prod_service').value, seoT: document.getElementById('prod_seot').value, seoD: document.getElementById('prod_seod').value, seoK: document.getElementById('prod_seok').value, ogTitle: document.getElementById('prod_ogtitle').value, ogDesc: document.getElementById('prod_ogdesc').value, ogImage: document.getElementById('prod_ogimage').value, twCard: document.getElementById('prod_twcard').value };
-            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveProduct', data }) });
-            location.reload();
-        };
-        window.deleteProductItem = async (id) => { if(confirm('Delete product?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
-        window.editProduct = (id) => openProductModal(id);
+        window.deleteProductItem = async (id) => { if(confirm('Delete?')) { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); location.reload(); } };
 
         window.closeModal = (id) => { const el = document.getElementById(id); if (el) el.remove(); };
         function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
