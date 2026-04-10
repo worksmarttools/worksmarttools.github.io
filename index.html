@@ -1,43 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login System</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Sheet Login</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; margin-top: 50px; }
+        .login-box { border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
+        input { display: block; margin: 10px 0; padding: 8px; width: 200px; }
+        button { cursor: pointer; width: 100%; padding: 10px; background: #28a745; color: white; border: none; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div id="loginForm" class="form-container active">
-            <div class="card">
-                <h2>Login</h2>
-                <form id="loginFormElement">
-                    <div class="input-group">
-                        <label>Username</label>
-                        <input type="text" id="username" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Password</label>
-                        <input type="password" id="password" required>
-                    </div>
-                    <button type="submit" id="loginBtn">Sign In</button>
-                    <div id="loginMessage" class="message"></div>
-                </form>
-            </div>
-        </div>
 
-        <div id="dashboard" class="dashboard-container">
-            <div class="card">
-                <div class="dashboard-header">
-                    <h2>Welcome, <span id="welcomeUsername"></span>!</h2>
-                    <button id="logoutBtn" class="logout-btn">Logout</button>
-                </div>
-                <div class="dashboard-content">
-                    <p>You are logged in successfully.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    <script src="script.js"></script>
+<div class="login-box">
+    <h3>Login</h3>
+    <input type="text" id="user" placeholder="Username">
+    <input type="password" id="pass" placeholder="Password">
+    <button onclick="handleLogin()">Sign In</button>
+    <p id="msg"></p>
+</div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwZtVRco7mOEM7JOlxpWe3LYVpXC5TvLsJeWSTY-GdR7w0w3O26IOH2josmLEG8iU9f/exec";
+
+    async function handleLogin() {
+        const username = document.getElementById('user').value;
+        const password = document.getElementById('pass').value;
+        const msg = document.getElementById('msg');
+
+        msg.innerText = "Checking...";
+
+        try {
+            const response = await fetch(SCRIPT_URL, {
+                method: "POST",
+                body: JSON.stringify({ username, password })
+            });
+            const result = await response.json();
+
+            if (result.status === "success") {
+                msg.style.color = "green";
+                msg.innerText = "Welcome, " + username + "!";
+            } else {
+                msg.style.color = "red";
+                msg.innerText = result.message;
+            }
+        } catch (error) {
+            msg.innerText = "Error connecting to server.";
+        }
+    }
+</script>
 </body>
 </html>
