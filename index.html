@@ -8,6 +8,9 @@
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap" rel="stylesheet">
+    <!-- Include Quill.js for rich text editor -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <style>
         :root { --primary: #0f172a; --radius: 1rem; --bg: #f8fafc; }
         body { background: var(--bg); font-family: 'Inter', sans-serif; }
@@ -17,18 +20,9 @@
         .tab-active { border-bottom: 2px solid var(--primary); color: var(--primary); font-weight: bold; }
         .dropdown:hover .dropdown-menu { display: block; }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        /* Custom confirmation modal */
-        .confirm-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 1000;
-        }
-        .confirm-box {
-            background: white; border-radius: 1.5rem; padding: 2rem;
-            max-width: 400px; width: 90%; text-align: center;
-            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.3);
-        }
+        .confirm-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .confirm-box { background: white; border-radius: 1.5rem; padding: 2rem; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.3); }
+        .ql-container { min-height: 200px; }
     </style>
 </head>
 <body>
@@ -50,10 +44,11 @@
     <footer id="siteFooter" class="border-t mt-12 py-12 bg-white"></footer>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbxn7M_njiqzQIt18Def2o7tAE5sKisU3N796jVJICQOJoSOmMrGUVjJ6fW8Ry7L4v3y/exec"; // REPLACE WITH YOUR DEPLOYED URL
+        const API_URL = "https://script.google.com/macros/s/AKfycbzYW-R3lnLlggQJi7UM0DurOMTyEwEy893ekADJnB5Fa0FNzw6EmMLye3AphYQp4fEq/exec"; // REPLACE WITH YOUR DEPLOYED URL
         let store = { company: [], products: [], categories: [], pages: [], contentBlocks: [], theme: [], seoDefaults: [], footer: [] };
         let activeCategoryFilter = "all";
-        let currentAdminTab = "site"; // Track active admin tab for re-rendering
+        let currentAdminTab = "site";
+        let quillEditor = null;
 
         // ======================== CORE ========================
         async function fetchData() {
@@ -61,12 +56,9 @@
                 const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'getPublicData' }) });
                 const json = await res.json();
                 store = json.data;
-                // Fix: map ContentBlocks correctly (sheet uses "Content" column, not "Settings")
                 if (store.contentBlocks) {
                     store.contentBlocks = store.contentBlocks.map(block => {
-                        if (block.Content !== undefined && block.Settings === undefined) {
-                            block.Settings = block.Content;
-                        }
+                        if (block.Content !== undefined && block.Settings === undefined) block.Settings = block.Content;
                         return block;
                     });
                 }
@@ -147,7 +139,6 @@
         }
         function setMetaTag(name, content) { if(!content) return; let meta = document.querySelector(`meta[name="${name}"]`); if(!meta) { meta = document.createElement('meta'); meta.name = name; document.head.appendChild(meta); } meta.content = content; }
 
-        // ======================== IMAGE UPLOAD ========================
         async function uploadImage(fileInput, targetFieldId) {
             if (!fileInput.files.length) return;
             const file = fileInput.files[0];
@@ -164,35 +155,15 @@
             reader.readAsDataURL(file);
         }
 
-        // ======================== CUSTOM CONFIRMATION MODAL (No popup block) ========================
-        function showConfirm(message, onConfirm) {
-            const overlay = document.createElement('div');
-            overlay.className = 'confirm-overlay';
-            overlay.innerHTML = `
-                <div class="confirm-box">
-                    <p class="text-lg font-black mb-6">${escapeHtml(message)}</p>
-                    <div class="flex gap-4 justify-center">
-                        <button class="confirm-yes bg-red-600 text-white px-6 py-2 rounded-full font-bold hover:bg-red-700">Yes, Delete</button>
-                        <button class="confirm-no bg-slate-200 px-6 py-2 rounded-full font-bold hover:bg-slate-300">Cancel</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-            overlay.querySelector('.confirm-yes').onclick = () => { overlay.remove(); onConfirm(); };
-            overlay.querySelector('.confirm-no').onclick = () => overlay.remove();
-        }
-
-        // ======================== BLOCK RENDERING (HOME) - SAFE JSON ========================
+        // ======================== HOME PAGE BLOCK RENDERING ========================
         function renderBlocks(blocks, container) {
+            const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
             for (const block of blocks.sort((a,b)=>a.Order-b.Order)) {
                 try {
                     let settings = {};
                     if (block.Settings) {
-                        if (typeof block.Settings === 'string') {
-                            settings = JSON.parse(block.Settings);
-                        } else {
-                            settings = block.Settings;
-                        }
+                        if (typeof block.Settings === 'string') settings = JSON.parse(block.Settings);
+                        else settings = block.Settings;
                     }
                     if (block.Type === 'hero_image') {
                         const imageUrl = settings.image && settings.image.trim() !== '' ? settings.image : 'https://images.unsplash.com/photo-1497215728101-856f4ea42174';
@@ -210,8 +181,24 @@
                         const swiperId = `swiper-${Date.now()}`;
                         container.innerHTML += `<div class="swiper ${swiperId} rounded-[var(--radius)] mb-12 overflow-hidden"><div class="swiper-wrapper">${slides.map(slide => `<div class="swiper-slide relative"><img src="${slide.image}" alt="${escapeHtml(slide.alt || 'Slide')}" class="w-full h-[500px] object-cover"><div class="absolute inset-0 bg-black/30 flex flex-col justify-center items-center text-white text-center p-6"><h2 class="text-4xl md:text-6xl font-black">${escapeHtml(slide.caption)}</h2><p class="text-lg mt-2">${escapeHtml(slide.description)}</p></div></div>`).join('')}</div><div class="swiper-button-next"></div><div class="swiper-button-prev"></div><div class="swiper-pagination"></div></div>`;
                         setTimeout(() => new Swiper(`.${swiperId}`, { navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }, pagination: { el: '.swiper-pagination', clickable: true }, autoplay: settings.autoplay ? { delay: settings.interval || 5000 } : false, loop: slides.length > 1 }), 100);
+                    } else if (block.Type === 'company_name') {
+                        container.innerHTML += `<div class="mb-12 text-center"><h1 class="text-5xl md:text-7xl font-black dynamic-text">${escapeHtml(company.company_name || 'Your Company')}</h1></div>`;
+                    } else if (block.Type === 'tagline') {
+                        container.innerHTML += `<div class="mb-12 text-center"><p class="text-2xl md:text-3xl text-slate-600">${escapeHtml(company.company_moto || 'Innovative Solutions')}</p></div>`;
+                    } else if (block.Type === 'company_description') {
+                        container.innerHTML += `<div class="mb-12 max-w-3xl mx-auto text-center"><p class="text-lg text-slate-500 leading-relaxed">${escapeHtml(company.company_desc || '')}</p></div>`;
+                    } else if (block.Type === 'product_list') {
+                        const productsHtml = store.products.map(p => `
+                            <div class="bg-white rounded-[var(--radius)] overflow-hidden shadow-sm border hover:shadow-xl transition-all group cursor-pointer" onclick="location.hash='#/product/${p.ID}'">
+                                <div class="relative h-56 overflow-hidden"><img src="${p.Thumbnail || 'https://placehold.co/600x400'}" alt="${escapeHtml(p.Title)}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"></div>
+                                <div class="p-5"><h3 class="text-lg font-black group-hover:dynamic-text">${escapeHtml(p.Title)}</h3><p class="text-slate-500 text-sm mt-1 line-clamp-2">${escapeHtml(p.Summary)}</p></div>
+                            </div>
+                        `).join('');
+                        container.innerHTML += `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">${productsHtml}</div>`;
                     } else if (block.Type === 'custom_html') {
-                        container.innerHTML += `<div class="mb-12">${settings}</div>`;
+                        container.innerHTML += `<div class="mb-12 prose max-w-none">${settings}</div>`;
+                    } else if (block.Type === 'rich_text') {
+                        container.innerHTML += `<div class="mb-12 prose max-w-none">${settings}</div>`;
                     }
                 } catch(e) { console.error('Block render error:', block, e); }
             }
@@ -224,6 +211,7 @@
             renderBlocks(blocks, container);
         }
 
+        // ======================== PRODUCTS & PAGES (unchanged) ========================
         function renderProductList(container) {
             const filtered = activeCategoryFilter === "all" ? store.products : store.products.filter(p => p.Category == activeCategoryFilter);
             container.innerHTML = `
@@ -284,9 +272,13 @@
                 const company = Object.fromEntries((store.company || []).map(i=>[i.Key,i.Value]));
                 div.innerHTML = `
                     <div class="space-y-6"><div class="bg-slate-50 p-6 rounded-2xl"><h3 class="font-black text-xl mb-4">Theme Settings</h3><div class="grid md:grid-cols-2 gap-4"><div><label class="text-xs font-black">Primary Color</label><input type="color" id="primary_color" value="${theme.primary_color||'#0f172a'}" class="w-full h-10"></div><div><label class="text-xs font-black">Body Background</label><input type="color" id="body_bg" value="${theme.body_bg||'#f8fafc'}" class="w-full h-10"></div><div><label class="text-xs font-black">Card Radius (px)</label><input type="number" id="card_radius" value="${theme.card_radius||16}" class="border p-2 rounded w-full"></div><div><label class="text-xs font-black">Base Font Size (px)</label><input type="number" id="base_font_size" value="${theme.base_font_size||16}" class="border p-2 rounded w-full"></div><div><label class="text-xs font-black">Font Family</label><input id="font_family" value="${theme.font_family||'Inter'}" class="border p-2 rounded w-full"></div></div><button onclick="saveTheme()" class="btn-primary px-6 py-2 rounded mt-4">Save Theme</button></div>
-                    <div class="bg-slate-50 p-6 rounded-2xl"><h3 class="font-black text-xl mb-4">Company Info</h3><div class="grid md:grid-cols-2 gap-4"><div><label>Site Title</label><input id="comp_site_title" value="${escapeHtml(company.site_title||'')}" class="w-full border p-2 rounded"></div><div><label>Company Name</label><input id="comp_company_name" value="${escapeHtml(company.company_name||'')}" class="w-full border p-2 rounded"></div><div><label>Company Moto</label><input id="comp_company_moto" value="${escapeHtml(company.company_moto||'')}" class="w-full border p-2 rounded"></div><div><label>Logo</label><div class="flex gap-2"><input type="file" id="logoUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('logoUpload'),'comp_logo_url')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="comp_logo_url" value="${escapeHtml(company.logo_url||'')}" class="w-full border p-2 rounded mt-2" placeholder="Logo URL will appear here"></div></div><button onclick="saveCompany()" class="btn-primary px-6 py-2 rounded mt-4">Save Company</button></div></div>`;
+                    <div class="bg-slate-50 p-6 rounded-2xl"><h3 class="font-black text-xl mb-4">Company Info</h3><div class="grid md:grid-cols-2 gap-4"><div><label>Site Title</label><input id="comp_site_title" value="${escapeHtml(company.site_title||'')}" class="w-full border p-2 rounded"></div><div><label>Company Name</label><input id="comp_company_name" value="${escapeHtml(company.company_name||'')}" class="w-full border p-2 rounded"></div><div><label>Company Moto (Tagline)</label><input id="comp_company_moto" value="${escapeHtml(company.company_moto||'')}" class="w-full border p-2 rounded"></div><div><label>Company Description</label><textarea id="comp_company_desc" rows="3" class="w-full border p-2 rounded">${escapeHtml(company.company_desc||'')}</textarea></div><div><label>Logo</label><div class="flex gap-2"><input type="file" id="logoUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('logoUpload'),'comp_logo_url')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="comp_logo_url" value="${escapeHtml(company.logo_url||'')}" class="w-full border p-2 rounded mt-2"></div></div><button onclick="saveCompany()" class="btn-primary px-6 py-2 rounded mt-4">Save Company</button></div></div>`;
             } else if (tab === 'blocks') {
-                div.innerHTML = `<div class="bg-slate-50 p-6 rounded-2xl"><div id="blocksList"></div><button onclick="openBlockModal()" class="btn-primary px-4 py-2 rounded mt-4">+ Add Block</button></div>`;
+                div.innerHTML = `
+                    <div class="bg-slate-50 p-6 rounded-2xl">
+                        <div class="flex justify-between items-center mb-4"><h3 class="font-black text-xl">Homepage Blocks</h3><select id="blockTypeSelect" class="border p-2 rounded"><option value="hero_image">Hero Image</option><option value="carousel">Image Carousel</option><option value="company_name">Company Name</option><option value="tagline">Tagline</option><option value="company_description">Company Description</option><option value="product_list">Product List</option><option value="rich_text">Custom Rich Text</option></select><button onclick="addNewBlock()" class="btn-primary px-4 py-2 rounded">+ Add Block</button></div>
+                        <div id="blocksList"></div>
+                    </div>`;
                 renderBlocksList();
             } else if (tab === 'pages') {
                 div.innerHTML = `<div class="bg-slate-50 p-6 rounded-2xl"><div id="pagesList"></div><button onclick="openPageModal()" class="btn-primary px-4 py-2 rounded mt-4">+ New Page</button></div>`;
@@ -309,9 +301,150 @@
         function renderBlocksList() {
             const container = document.getElementById('blocksList');
             if (!container) return;
-            container.innerHTML = (store.contentBlocks || []).map(b => `<div class="border-b py-3 flex justify-between items-center"><div><b>${escapeHtml(b.BlockName)}</b> (${b.Type})<br><div class="text-xs text-slate-500">Order: ${b.Order} | Location: ${b.Location}</div></div><div><button onclick="editBlock('${b.BlockID}')" class="text-blue-500 mr-2">Edit</button><button onclick="deleteBlock('${b.BlockID}')" class="text-red-500">Delete</button></div></div>`).join('');
+            const blocks = (store.contentBlocks || []).filter(b => b.Location === 'homepage').sort((a,b)=>a.Order-b.Order);
+            container.innerHTML = blocks.map((b, idx) => `
+                <div class="border-b py-3 flex justify-between items-center">
+                    <div><b>${escapeHtml(b.BlockName)}</b> (${b.Type})<br><div class="text-xs text-slate-500">Order: ${b.Order}</div></div>
+                    <div class="flex gap-2">
+                        ${idx > 0 ? `<button onclick="moveBlock('${b.BlockID}', 'up')" class="text-blue-500 text-sm">↑ Up</button>` : ''}
+                        ${idx < blocks.length-1 ? `<button onclick="moveBlock('${b.BlockID}', 'down')" class="text-blue-500 text-sm">↓ Down</button>` : ''}
+                        <button onclick="editBlock('${b.BlockID}')" class="text-blue-500 text-sm">Edit</button>
+                        <button onclick="deleteBlock('${b.BlockID}')" class="text-red-500 text-sm">Delete</button>
+                    </div>
+                </div>
+            `).join('');
         }
 
+        async function moveBlock(id, direction) {
+            const blocks = (store.contentBlocks || []).filter(b => b.Location === 'homepage').sort((a,b)=>a.Order-b.Order);
+            const index = blocks.findIndex(b => b.BlockID == id);
+            if (index === -1) return;
+            const newIndex = direction === 'up' ? index - 1 : index + 1;
+            if (newIndex < 0 || newIndex >= blocks.length) return;
+            // Swap orders
+            const tempOrder = blocks[index].Order;
+            blocks[index].Order = blocks[newIndex].Order;
+            blocks[newIndex].Order = tempOrder;
+            // Save all orders
+            const updateData = blocks.map(b => ({ id: b.BlockID, order: b.Order }));
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'reorderBlocks', data: { blocks: updateData } }) });
+            fetchData();
+        }
+
+        async function addNewBlock() {
+            const type = document.getElementById('blockTypeSelect').value;
+            let blockName = '';
+            let settings = {};
+            if (type === 'hero_image') {
+                blockName = 'Hero Section';
+                settings = { image: '', caption: 'Welcome', description: '', alt: '', buttonText: 'Explore', buttonLink: '#/products' };
+            } else if (type === 'carousel') {
+                blockName = 'Carousel';
+                settings = { autoplay: true, interval: 5000, slides: [] };
+            } else if (type === 'company_name') {
+                blockName = 'Company Name';
+                settings = {};
+            } else if (type === 'tagline') {
+                blockName = 'Tagline';
+                settings = {};
+            } else if (type === 'company_description') {
+                blockName = 'Company Description';
+                settings = {};
+            } else if (type === 'product_list') {
+                blockName = 'Product List';
+                settings = {};
+            } else if (type === 'rich_text') {
+                blockName = 'Rich Text Block';
+                settings = '<p>Enter your content here...</p>';
+            }
+            const maxOrder = Math.max(0, ...(store.contentBlocks || []).map(b => b.Order || 0));
+            const data = { id: '', blockName, type, settings: JSON.stringify(settings), order: maxOrder + 1, location: 'homepage' };
+            await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
+            fetchData();
+        }
+
+        // ======================== BLOCK MODAL (with rich text editor for custom blocks) ========================
+        window.openBlockModal = (id=null) => {
+            const block = id ? store.contentBlocks.find(b => b.BlockID == id) : null;
+            if (!block) return;
+            let settings = {};
+            try { settings = JSON.parse(block.Settings); } catch(e) {}
+            const modal = document.createElement('div'); modal.id = 'blockModal'; modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
+            modal.innerHTML = `<div class="bg-white w-full max-w-3xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">Edit Block: ${escapeHtml(block.BlockName)}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><div id="dynamicSettings"></div><div class="flex gap-3 mt-6"><button onclick="saveBlockEdit()" class="btn-primary px-6 py-2 rounded">Save Changes</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
+            document.body.appendChild(modal);
+            const container = document.getElementById('dynamicSettings');
+            if (block.Type === 'hero_image') {
+                container.innerHTML = `
+                    <div class="space-y-3"><label>Image</label><div class="flex gap-2"><input type="file" id="heroImgUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('heroImgUpload'),'hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="hero_image" value="${escapeHtml(settings.image||'')}" class="w-full border p-2 rounded"><label>Caption</label><input id="hero_caption" value="${escapeHtml(settings.caption||'')}" class="w-full border p-2 rounded"><label>Description</label><textarea id="hero_desc" rows="3" class="w-full border p-2 rounded">${escapeHtml(settings.description||'')}</textarea><label>Alt Text</label><input id="hero_alt" value="${escapeHtml(settings.alt||'')}" class="w-full border p-2 rounded"><label>Button Text</label><input id="hero_btn_text" value="${escapeHtml(settings.buttonText||'')}" class="w-full border p-2 rounded"><label>Button Link</label><input id="hero_btn_link" value="${escapeHtml(settings.buttonLink||'#/products')}" class="w-full border p-2 rounded"></div>`;
+            } else if (block.Type === 'carousel') {
+                container.innerHTML = `<label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${settings.autoplay?'selected':''}>Yes</option><option value="false" ${!settings.autoplay?'selected':''}>No</option></select><label>Interval (ms)</label><input id="carousel_interval" type="number" value="${settings.interval||5000}" class="w-full border p-2 rounded mb-4"><div id="carouselSlidesList"></div><button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>`;
+                const slides = settings.slides || [];
+                const renderSlides = () => {
+                    const list = document.getElementById('carouselSlidesList');
+                    if (!list) return;
+                    list.innerHTML = '';
+                    slides.forEach((slide, idx) => {
+                        const div = document.createElement('div'); div.className = 'border p-3 rounded mb-2';
+                        div.innerHTML = `<h4>Slide ${idx+1}</h4><div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div><input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea><input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                        list.appendChild(div);
+                    });
+                };
+                window.uploadSlideImage = function(btn) {
+                    const fileInput = btn.previousElementSibling;
+                    if (!fileInput.files.length) return;
+                    const file = fileInput.files[0];
+                    const reader = new FileReader();
+                    reader.onload = async function(e) {
+                        const base64Data = e.target.result.split(',')[1];
+                        const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'uploadImage', data: { file: base64Data, filename: file.name, mimeType: file.type } }) });
+                        const json = await res.json();
+                        if (json.status === 'success') btn.closest('.border').querySelector('.slide-image').value = json.url;
+                        else alert('Upload failed');
+                    };
+                    reader.readAsDataURL(file);
+                };
+                window.addCarouselSlide = function() {
+                    const list = document.getElementById('carouselSlidesList');
+                    const div = document.createElement('div'); div.className = 'border p-3 rounded mb-2';
+                    div.innerHTML = `<h4>Slide ${list.children.length+1}</h4><div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div><input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1"><input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1"><textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea><input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded"><button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
+                    list.appendChild(div);
+                };
+                renderSlides();
+            } else if (block.Type === 'rich_text') {
+                const editorDiv = document.createElement('div'); editorDiv.id = 'richEditor'; editorDiv.style.height = '300px';
+                container.appendChild(editorDiv);
+                setTimeout(() => {
+                    quillEditor = new Quill('#richEditor', { theme: 'snow', modules: { toolbar: [['bold','italic','underline','strike'], [{'size': ['small',false,'large','huge']}], [{'color': []}], [{'align': []}], ['link','image'], ['clean']] } });
+                    quillEditor.root.innerHTML = settings;
+                }, 50);
+            } else {
+                // For other types, no editable settings (they pull from company data)
+                container.innerHTML = `<p class="text-slate-500">This block pulls data from Company Info and cannot be edited here.</p>`;
+            }
+            window.saveBlockEdit = async () => {
+                let newSettings = {};
+                if (block.Type === 'hero_image') {
+                    newSettings = { image: document.getElementById('hero_image')?.value, caption: document.getElementById('hero_caption')?.value, description: document.getElementById('hero_desc')?.value, alt: document.getElementById('hero_alt')?.value, buttonText: document.getElementById('hero_btn_text')?.value, buttonLink: document.getElementById('hero_btn_link')?.value };
+                } else if (block.Type === 'carousel') {
+                    const slides = [];
+                    document.querySelectorAll('#carouselSlidesList > div').forEach(div => {
+                        const img = div.querySelector('.slide-image')?.value;
+                        if (img) slides.push({ image: img, caption: div.querySelector('.slide-caption')?.value, description: div.querySelector('.slide-desc')?.value, alt: div.querySelector('.slide-alt')?.value });
+                    });
+                    newSettings = { autoplay: document.getElementById('carousel_autoplay')?.value === 'true', interval: parseInt(document.getElementById('carousel_interval')?.value) || 5000, slides };
+                } else if (block.Type === 'rich_text') {
+                    newSettings = quillEditor ? quillEditor.root.innerHTML : settings;
+                } else {
+                    newSettings = settings;
+                }
+                const data = { id: block.BlockID, blockName: block.BlockName, type: block.Type, settings: JSON.stringify(newSettings), order: block.Order, location: block.Location };
+                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
+                fetchData();
+            };
+        };
+        window.editBlock = (id) => openBlockModal(id);
+
+        // ======================== OTHER CRUD FUNCTIONS (unchanged) ========================
         function renderPagesList() {
             const container = document.getElementById('pagesList');
             if (!container) return;
@@ -330,7 +463,6 @@
             container.innerHTML = (store.categories || []).map(c => `<div class="flex justify-between items-center border-b py-2"><span class="font-bold">${escapeHtml(c.Name)}</span><button onclick="deleteCategoryItem('${c.ID}')" class="text-red-500 text-xs">Delete</button></div>`).join('');
         }
 
-        // ======================== CRUD HELPERS ========================
         function getCategoryName(catId) { const c = store.categories.find(c => c.ID == catId); return c ? c.Name : (catId === "general" ? "General" : catId); }
 
         window.adminLogin = async () => { 
@@ -346,7 +478,7 @@
         };
         
         window.saveCompany = async () => { 
-            const data = { site_title: document.getElementById('comp_site_title')?.value, company_name: document.getElementById('comp_company_name')?.value, company_moto: document.getElementById('comp_company_moto')?.value, logo_url: document.getElementById('comp_logo_url')?.value }; 
+            const data = { site_title: document.getElementById('comp_site_title')?.value, company_name: document.getElementById('comp_company_name')?.value, company_moto: document.getElementById('comp_company_moto')?.value, company_desc: document.getElementById('comp_company_desc')?.value, logo_url: document.getElementById('comp_logo_url')?.value }; 
             await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'updateSettings', data }) }); 
             fetchData(); 
         };
@@ -370,52 +502,21 @@
             fetchData(); 
         };
         
-        // ======================== DELETE FUNCTIONS (No page reload, custom confirmation) ========================
-        async function performDelete(action, id, itemType, refreshCallback) {
-            const res = await fetch(API_URL, { method:'POST', body:JSON.stringify({ action, data:{id} }) });
-            const json = await res.json();
-            if (json.status === 'success') {
-                // Remove from local store
-                if (itemType === 'product') store.products = store.products.filter(p => p.ID != id);
-                else if (itemType === 'page') store.pages = store.pages.filter(p => p.ID != id);
-                else if (itemType === 'block') store.contentBlocks = store.contentBlocks.filter(b => b.BlockID != id);
-                else if (itemType === 'category') store.categories = store.categories.filter(c => c.ID != id);
-                // Refresh current admin view
-                if (refreshCallback) refreshCallback();
-                else loadTab(currentAdminTab);
-            } else {
-                alert('Delete failed: ' + json.message);
-            }
+        // Delete functions with custom confirm
+        function showConfirm(message, onConfirm) {
+            const overlay = document.createElement('div'); overlay.className = 'confirm-overlay';
+            overlay.innerHTML = `<div class="confirm-box"><p class="text-lg font-black mb-6">${escapeHtml(message)}</p><div class="flex gap-4 justify-center"><button class="confirm-yes bg-red-600 text-white px-6 py-2 rounded-full font-bold hover:bg-red-700">Yes, Delete</button><button class="confirm-no bg-slate-200 px-6 py-2 rounded-full font-bold hover:bg-slate-300">Cancel</button></div></div>`;
+            document.body.appendChild(overlay);
+            overlay.querySelector('.confirm-yes').onclick = () => { overlay.remove(); onConfirm(); };
+            overlay.querySelector('.confirm-no').onclick = () => overlay.remove();
         }
 
-        window.deleteProductItem = (id) => {
-            showConfirm('Permanently delete this product?', async () => {
-                await performDelete('deleteProduct', id, 'product', () => {
-                    if (window.location.hash === '#/admin') loadTab('products');
-                    else router();
-                });
-            });
-        };
-        
-        window.deletePageItem = (id) => {
-            showConfirm('Permanently delete this page?', async () => {
-                await performDelete('deletePage', id, 'page', () => loadTab('pages'));
-            });
-        };
-        
-        window.deleteBlock = (id) => {
-            showConfirm('Permanently delete this content block?', async () => {
-                await performDelete('deleteContentBlock', id, 'block', () => loadTab('blocks'));
-            });
-        };
-        
-        window.deleteCategoryItem = (id) => {
-            showConfirm('Permanently delete this category?', async () => {
-                await performDelete('deleteCategory', id, 'category', () => loadTab('categories'));
-            });
-        };
+        window.deleteProductItem = (id) => { showConfirm('Permanently delete this product?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteProduct', data:{id} }) }); fetchData(); }); };
+        window.deletePageItem = (id) => { showConfirm('Permanently delete this page?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deletePage', data:{id} }) }); fetchData(); }); };
+        window.deleteBlock = (id) => { showConfirm('Permanently delete this block?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteContentBlock', data:{id} }) }); fetchData(); }); };
+        window.deleteCategoryItem = (id) => { showConfirm('Permanently delete this category?', async () => { await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'deleteCategory', data:{id} }) }); fetchData(); }); };
 
-        // ======================== PRODUCT MODAL ========================
+        // Product modal (unchanged)
         window.openProductModal = () => openProductModalEdit(null);
         window.openProductModalEdit = (id) => {
             const prod = id ? store.products.find(p => p.ID == id) : { ID:'', Category: store.categories[0]?.ID || 'general', Title:'', Thumbnail:'', Images:'', Summary:'', Description:'', Technical_Info:'', Terms:'', Privacy:'', ServiceCommitment:'', SEOTitle:'', SEODesc:'', SEOKeywords:'', OGTitle:'', OGDesc:'', OGImage:'', TwitterCard:'summary_large_image' };
@@ -430,99 +531,7 @@
             };
         };
 
-        // ======================== BLOCK MODAL (FIXED CAROUSEL) ========================
-        window.openBlockModal = (id=null) => {
-            const block = id ? store.contentBlocks.find(b => b.BlockID == id) : { BlockID:'', BlockName:'', Type:'hero_image', Settings:'{}', Order:0, Location:'homepage' };
-            let settings = {};
-            try { settings = JSON.parse(block.Settings); } catch(e) {}
-            const modal = document.createElement('div'); modal.id = 'blockModal'; modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-auto';
-            modal.innerHTML = `<div class="bg-white w-full max-w-2xl rounded-2xl p-6"><h3 class="text-2xl font-black mb-4">${id ? 'Edit Block' : 'New Block'}</h3><input type="hidden" id="block_id" value="${block.BlockID}"><input id="block_name" placeholder="Block Name" value="${escapeHtml(block.BlockName)}" class="w-full border p-3 rounded mb-3"><select id="block_type" class="w-full border p-3 rounded mb-3" onchange="toggleBlockSettings()"><option value="hero_image" ${block.Type==='hero_image'?'selected':''}>Hero Image</option><option value="carousel" ${block.Type==='carousel'?'selected':''}>Image Carousel</option><option value="custom_html" ${block.Type==='custom_html'?'selected':''}>Custom HTML</option></select><div id="settingsContainer"></div><input id="block_order" type="number" placeholder="Order" value="${block.Order}" class="w-full border p-3 rounded mb-3"><select id="block_location" class="w-full border p-3 rounded mb-4"><option value="homepage" ${block.Location==='homepage'?'selected':''}>Homepage</option></select><div class="flex gap-3"><button onclick="submitBlock()" class="btn-primary px-6 py-2 rounded">Save</button><button onclick="closeModal('blockModal')" class="bg-slate-200 px-6 py-2 rounded">Cancel</button></div></div>`;
-            document.body.appendChild(modal);
-            
-            window.uploadSlideImage = function(btn) {
-                const fileInput = btn.previousElementSibling;
-                if (!fileInput.files.length) return;
-                const file = fileInput.files[0];
-                const reader = new FileReader();
-                reader.onload = async function(e) {
-                    const base64Data = e.target.result.split(',')[1];
-                    const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'uploadImage', data: { file: base64Data, filename: file.name, mimeType: file.type } }) });
-                    const json = await res.json();
-                    if (json.status === 'success') {
-                        btn.closest('.border').querySelector('.slide-image').value = json.url;
-                        alert('Image uploaded!');
-                    } else alert('Upload failed');
-                };
-                reader.readAsDataURL(file);
-            };
-            
-            window.addCarouselSlide = function() {
-                const list = document.getElementById('carouselSlidesList');
-                const div = document.createElement('div');
-                div.className = 'border p-3 rounded mb-2';
-                div.innerHTML = `<h4>Slide ${list.children.length+1}</h4>
-                    <div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div>
-                    <input type="text" placeholder="Image URL" class="slide-image w-full border p-1 rounded mb-1">
-                    <input type="text" placeholder="Caption" class="slide-caption w-full border p-1 rounded mb-1">
-                    <textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1"></textarea>
-                    <input type="text" placeholder="Alt Text" class="slide-alt w-full border p-1 rounded">
-                    <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
-                list.appendChild(div);
-            };
-            
-            window.toggleBlockSettings = function() {
-                const type = document.getElementById('block_type').value;
-                const container = document.getElementById('settingsContainer');
-                if (type === 'hero_image') {
-                    container.innerHTML = `<div class="flex gap-2 mb-2"><input type="file" id="heroImageUpload" accept="image/*"><button onclick="uploadImage(document.getElementById('heroImageUpload'),'hero_image')" class="bg-slate-200 px-3 py-1 rounded text-xs">Upload</button></div><input id="hero_image" placeholder="Image URL (auto-filled)" value="${escapeHtml(settings.image||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_caption" placeholder="Caption" value="${escapeHtml(settings.caption||'')}" class="w-full border p-2 rounded mb-2"><textarea id="hero_desc" placeholder="Description" class="w-full border p-2 rounded mb-2">${escapeHtml(settings.description||'')}</textarea><input id="hero_alt" placeholder="Alt Text" value="${escapeHtml(settings.alt||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_btn_text" placeholder="Button Text" value="${escapeHtml(settings.buttonText||'')}" class="w-full border p-2 rounded mb-2"><input id="hero_btn_link" placeholder="Button Link" value="${escapeHtml(settings.buttonLink||'#/products')}" class="w-full border p-2 rounded">`;
-                } else if (type === 'carousel') {
-                    const slides = settings.slides || [];
-                    container.innerHTML = `<label>Autoplay</label><select id="carousel_autoplay" class="w-full border p-2 rounded mb-2"><option value="true" ${settings.autoplay?'selected':''}>Yes</option><option value="false" ${!settings.autoplay?'selected':''}>No</option></select><label>Interval (ms)</label><input id="carousel_interval" type="number" value="${settings.interval||5000}" class="w-full border p-2 rounded mb-4"><div id="carouselSlidesList"></div><button type="button" onclick="addCarouselSlide()" class="bg-slate-200 px-3 py-1 rounded text-sm mb-3">+ Add Slide</button>`;
-                    const listDiv = document.getElementById('carouselSlidesList');
-                    if (listDiv) {
-                        listDiv.innerHTML = '';
-                        slides.forEach((slide, idx) => {
-                            const div = document.createElement('div');
-                            div.className = 'border p-3 rounded mb-2';
-                            div.innerHTML = `<h4>Slide ${idx+1}</h4>
-                                <div class="flex gap-2 mb-1"><input type="file" class="slideUpload" accept="image/*"><button onclick="uploadSlideImage(this)" class="bg-slate-200 px-2 py-0.5 rounded text-xs">Upload</button></div>
-                                <input type="text" placeholder="Image URL" value="${escapeHtml(slide.image)}" class="slide-image w-full border p-1 rounded mb-1">
-                                <input type="text" placeholder="Caption" value="${escapeHtml(slide.caption)}" class="slide-caption w-full border p-1 rounded mb-1">
-                                <textarea placeholder="Description" class="slide-desc w-full border p-1 rounded mb-1">${escapeHtml(slide.description)}</textarea>
-                                <input type="text" placeholder="Alt Text" value="${escapeHtml(slide.alt)}" class="slide-alt w-full border p-1 rounded">
-                                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 text-xs mt-1">Remove</button>`;
-                            listDiv.appendChild(div);
-                        });
-                    }
-                } else {
-                    container.innerHTML = `<textarea id="custom_html" rows="10" class="w-full border p-2 rounded">${escapeHtml(block.Settings)}</textarea>`;
-                }
-            };
-            toggleBlockSettings();
-            
-            window.submitBlock = async () => {
-                const type = document.getElementById('block_type').value;
-                let settings = {};
-                if (type === 'hero_image') {
-                    settings = { image: document.getElementById('hero_image')?.value, caption: document.getElementById('hero_caption')?.value, description: document.getElementById('hero_desc')?.value, alt: document.getElementById('hero_alt')?.value, buttonText: document.getElementById('hero_btn_text')?.value, buttonLink: document.getElementById('hero_btn_link')?.value };
-                } else if (type === 'carousel') {
-                    const slides = [];
-                    document.querySelectorAll('#carouselSlidesList > div').forEach(div => {
-                        const img = div.querySelector('.slide-image')?.value;
-                        if (img) slides.push({ image: img, caption: div.querySelector('.slide-caption')?.value, description: div.querySelector('.slide-desc')?.value, alt: div.querySelector('.slide-alt')?.value });
-                    });
-                    settings = { autoplay: document.getElementById('carousel_autoplay')?.value === 'true', interval: parseInt(document.getElementById('carousel_interval')?.value) || 5000, slides };
-                } else {
-                    settings = document.getElementById('custom_html')?.value;
-                }
-                const data = { id: document.getElementById('block_id').value, blockName: document.getElementById('block_name').value, type: type, settings: JSON.stringify(settings), order: document.getElementById('block_order').value, location: document.getElementById('block_location').value };
-                await fetch(API_URL, { method:'POST', body:JSON.stringify({ action:'saveContentBlock', data }) });
-                fetchData();
-            };
-        };
-        window.editBlock = (id) => openBlockModal(id);
-
-        // ======================== PAGE MODAL ========================
+        // Page modal (unchanged)
         window.openPageModal = (id=null) => {
             const page = id ? store.pages.find(p => p.ID == id) : { ID:'', Slug:'', Title:'', Content:'', MenuOrder:0, Status:'published', ParentID:'' };
             const parentOptions = '<option value="">None (Root)</option>' + (store.pages || []).filter(p => p.ID !== page.ID).map(p => `<option value="${p.ID}" ${page.ParentID===p.ID?'selected':''}>${escapeHtml(p.Title)}</option>`).join('');
